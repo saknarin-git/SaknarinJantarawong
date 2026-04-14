@@ -1,0 +1,13 @@
+{
+  "name": "gas-loan-system-ban-phitam",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "deploy": "powershell -ExecutionPolicy Bypass -File ./scripts/push-github.ps1",
+    "deploy:prod": "powershell -ExecutionPolicy Bypass -File ./scripts/push-github.ps1 -Message prod-backup",
+    "deploy:gas": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy.ps1"
+  },
+  "devDependencies": {
+    "@google/clasp": "^3.3.0"
+  }
+}
