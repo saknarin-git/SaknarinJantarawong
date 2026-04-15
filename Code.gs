@@ -100,6 +100,7 @@ function doPost(e) {
 }
 
 var AUTH_SESSION_TTL_SECONDS = 21600;
+var LOGIN_REQUIRED = false;
 var MAX_LOGIN_ATTEMPTS = 5;
 var LOGIN_LOCKOUT_SECONDS = 900;
 var USER_AUTHZ_CACHE_TTL_SECONDS = 120;
@@ -445,6 +446,19 @@ function touchAuthenticatedSession_(sessionData) {
 
 function requireAuthenticatedSession_() {
   var sessionData = getAuthenticatedSession_();
+
+  if (!LOGIN_REQUIRED) {
+    if (!sessionData || !sessionData.username) {
+      sessionData = createAuthenticatedSession_({
+        userId: 'direct-access',
+        username: 'admin',
+        fullName: 'ผู้ดูแลระบบ',
+        role: 'admin'
+      });
+    }
+    return touchAuthenticatedSession_(sessionData) || sessionData;
+  }
+
   if (!sessionData || !sessionData.username) {
     throw new Error('UNAUTHORIZED: กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
   }
@@ -515,6 +529,9 @@ function clearFailedLoginAttempts_(username) {
 }
 
 function logoutCurrentSession() {
+  if (!LOGIN_REQUIRED) {
+    return { status: 'Success', clearSessionToken: false, message: 'ระบบเปิดใช้งานแบบไม่ต้องล็อกอิน' };
+  }
   clearAuthenticatedSession_();
   return { status: 'Success', clearSessionToken: true };
 }
@@ -1097,6 +1114,7 @@ function getCurrentUserPermissionSet_() {
 
 function requirePermission_(permissionKey, friendlyMessage) {
   var sessionData = requireAuthenticatedSession_();
+  if (normalizeUserRole_(sessionData.role) === 'admin') return sessionData;
   var authSnapshot = getUserAuthorizationSnapshot_(sessionData.username);
   if (normalizeUserRole_(authSnapshot && authSnapshot.role) === 'admin') return sessionData;
   if (!hasPermissionFromSnapshot_(authSnapshot, permissionKey)) {
