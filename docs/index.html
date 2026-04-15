@@ -2861,6 +2861,9 @@
     const canAccessSettingsWorkspace = canViewSettings || canManageSettings || canManageUsers || canRunBackup || canCloseAccounting || canRequestApprovals || canViewApprovals || canManageApprovals || canManageNotifications || canViewNotificationHistory || canViewAuditLogs;
     const canViewExecutiveDashboard = hasPermissionFrontend("dashboard.executive");
     const canCreatePayments = hasPermissionFrontend("payments.create");
+    const canAccessPaymentsTab = canCreatePayments || canEditPayments || canViewPaymentRecords || canRequestApprovals || canRunBackup || canCloseAccounting;
+    const canOpenMembersTab = canViewMembers || canManageMembers;
+    const canOpenLoansTab = canViewLoans || canManageLoans;
     const [authView, setAuthView] = useState("login");
     const [authNotice, setAuthNotice] = useState({ type: "idle", message: "" });
     const [registerForm, setRegisterForm] = useState({ prefix: "", firstName: "", lastName: "", username: "", email: "", pin: "", confirmPin: "" });
@@ -3213,18 +3216,42 @@
       elasticDrawer: true,
       rippleClick: true,
       hoverUnderline: true,
-      iconRotate: true
+      iconRotate: true,
+      publicPages: {
+        dashboard: true,
+        reports: true,
+        qualifications: true,
+        members: false,
+        loans: false
+      }
     };
+    const publicPageOptions = useMemo(() => [
+      { key: "dashboard", label: "แดชบอร์ด", hint: "ดูภาพรวมตัวเลขสำคัญ", icon: LayoutDashboard },
+      { key: "reports", label: "รายงาน", hint: "เปิดดูรายงานแบบอ่านอย่างเดียว", icon: FileText },
+      { key: "qualifications", label: "ตรวจสอบคุณสมบัติ", hint: "ค้นหาและตรวจสอบข้อมูลเบื้องต้น", icon: UserCheck },
+      { key: "members", label: "ทะเบียนสมาชิก", hint: "ดูจำนวนและรายชื่อสมาชิกแบบสรุป", icon: Users },
+      { key: "loans", label: "จัดการสินเชื่อ", hint: "ดูสถานะสัญญาและภาพรวมสินเชื่อ", icon: CreditCard }
+    ], []);
     const [menuSettings, setMenuSettings] = useState(() => {
       try {
         if (typeof localStorage !== "undefined") {
           const saved = JSON.parse(localStorage.getItem("menuSettings") || "null");
           if (saved && typeof saved === "object") {
-            return { ...defaultMenuSettings, ...saved };
+            return {
+              ...defaultMenuSettings,
+              ...saved,
+              publicPages: {
+                ...(defaultMenuSettings.publicPages || {}),
+                ...((saved && saved.publicPages) || {})
+              }
+            };
           }
         }
       } catch (e) {}
-      return { ...defaultMenuSettings };
+      return {
+        ...defaultMenuSettings,
+        publicPages: { ...(defaultMenuSettings.publicPages || {}) }
+      };
     });
     const [menuSettingsStatus, setMenuSettingsStatus] = useState({ type: "idle", message: "" });
     const [operatingDayYearBe, setOperatingDayYearBe] = useState(() => String((/* @__PURE__ */ new Date()).getFullYear() + 543));
@@ -3792,6 +3819,12 @@ const [cancellingTransactionId, setCancellingTransactionId] = useState("");
       if (normalizedMode === "slide-right") normalizedSide = "right";
       if (!allowedSides.has(normalizedSide)) normalizedSide = defaultMenuSettings.drawerSide;
       const readBool = (key) => Object.prototype.hasOwnProperty.call(source, key) ? !!source[key] : !!defaultMenuSettings[key];
+      const publicPageDefaults = defaultMenuSettings.publicPages || {};
+      const sourcePublicPages = source.publicPages && typeof source.publicPages === "object" && !Array.isArray(source.publicPages) ? source.publicPages : {};
+      const normalizedPublicPages = Object.keys(publicPageDefaults).reduce((acc, key) => {
+        acc[key] = Object.prototype.hasOwnProperty.call(sourcePublicPages, key) ? !!sourcePublicPages[key] : !!publicPageDefaults[key];
+        return acc;
+      }, {});
       return {
         primaryMode: normalizedMode,
         drawerSide: normalizedSide,
@@ -3803,10 +3836,13 @@ const [cancellingTransactionId, setCancellingTransactionId] = useState("");
         elasticDrawer: readBool("elasticDrawer"),
         rippleClick: readBool("rippleClick"),
         hoverUnderline: readBool("hoverUnderline"),
-        iconRotate: readBool("iconRotate")
+        iconRotate: readBool("iconRotate"),
+        publicPages: normalizedPublicPages
       };
     }, []);
     const effectiveMenuSettings = useMemo(() => normalizeMenuSettingsFrontend(menuSettings), [menuSettings, normalizeMenuSettingsFrontend]);
+    const publicGuestPageMap = effectiveMenuSettings.publicPages || defaultMenuSettings.publicPages || {};
+    const guestVisibleTabs = useMemo(() => publicPageOptions.filter((item) => !!publicGuestPageMap[item.key]).map((item) => item.key), [publicPageOptions, publicGuestPageMap]);
     useEffect(() => {
       if (typeof document === "undefined" || !document.body) return;
       const body = document.body;
@@ -6362,7 +6398,7 @@ const getQuickOverviewToneClass = (tone) => {
             if (typeof (result == null ? void 0 : result.sessionToken) === "string" && result.sessionToken.trim()) {
               sessionStorage.setItem("gasSessionToken", result.sessionToken.trim());
             }
-            sessionStorage.setItem("activeTab", "payments");
+            sessionStorage.setItem("activeTab", "profile");
             sessionStorage.setItem("currentUsername", normalizedUsername);
             sessionStorage.setItem("currentUserFullName", normalizedFullName);
             sessionStorage.setItem("currentUserRole", normalizedRole);
@@ -6374,7 +6410,7 @@ const getQuickOverviewToneClass = (tone) => {
             setCurrentUserRole(normalizedRole);
             setCurrentUserPermissions(normalizedPermissions);
             setPermissionCatalog(Array.isArray(result == null ? void 0 : result.permissionCatalog) ? result.permissionCatalog : []);
-            setActiveTab("payments");
+            setActiveTab("profile");
             setAuthNotice({ type: "idle", message: "" });
             setIsAuthenticated(true);
           } else {
@@ -8216,15 +8252,19 @@ const renderApprovalDashboardPanel = () => {
         setActiveTab("profile");
         return;
       }
-      if (activeTab === "payment_records" && !canViewPaymentRecords) {
-        setActiveTab("payments");
-        return;
-      }
-      if (activeTab === "members" && !canViewMembers) {
+      if (activeTab === "payments" && !canAccessPaymentsTab) {
         setActiveTab("dashboard");
         return;
       }
-      if (activeTab === "loans" && !canViewLoans) {
+      if (activeTab === "payment_records" && !canViewPaymentRecords) {
+        setActiveTab(canAccessPaymentsTab ? "payments" : "dashboard");
+        return;
+      }
+      if (activeTab === "members" && !canOpenMembersTab) {
+        setActiveTab("dashboard");
+        return;
+      }
+      if (activeTab === "loans" && !canOpenLoansTab) {
         setActiveTab("dashboard");
         return;
       }
@@ -8232,14 +8272,15 @@ const renderApprovalDashboardPanel = () => {
         setActiveTab("dashboard");
         return;
       }
-    }, [activeTab, isAuthenticated, canAccessSettingsWorkspace, canViewPaymentRecords, canViewMembers, canViewLoans, canViewReports]);
+    }, [activeTab, isAuthenticated, canAccessSettingsWorkspace, canAccessPaymentsTab, canViewPaymentRecords, canOpenMembersTab, canOpenLoansTab, canViewReports]);
 
     useEffect(() => {
       if (isAuthenticated) return;
-      if (!["dashboard", "reports", "qualifications"].includes(activeTab)) {
-        setActiveTab("dashboard");
+      const allowedGuestTabs = [...guestVisibleTabs, "profile"];
+      if (!allowedGuestTabs.includes(activeTab)) {
+        setActiveTab(guestVisibleTabs[0] || "profile");
       }
-    }, [isAuthenticated, activeTab]);
+    }, [isAuthenticated, activeTab, guestVisibleTabs]);
 
     const handleCloseDayEnd = () => {
       if (!canCloseAccounting && !canRequestApprovals) {
@@ -11876,7 +11917,8 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
         /* @__PURE__ */ React.createElement("button", { key: "back", type: "button", onClick: () => switchAuthView("login"), className: "w-full rounded-2xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50" }, "กลับหน้าเข้าสู่ระบบ")
       ]);
       const currentForm = authView === "login" ? loginForm : authView === "register" ? registerFormView : authView === "verifyEmail" ? verifyEmailFormView : authView === "adminRecovery" ? adminRecoveryFormView : forgotFormView;
-      const guestActiveTab = activeTab === "reports" || activeTab === "qualifications" ? activeTab : "dashboard";
+      const guestActiveTab = activeTab === "profile" || guestVisibleTabs.includes(activeTab) ? activeTab : (guestVisibleTabs[0] || "profile");
+      const guestMenuEntries = publicPageOptions.filter((page) => guestVisibleTabs.includes(page.key));
       const publicMenuClass = (tab) => `w-full rounded-2xl border px-4 py-3 text-left transition ${guestActiveTab === tab ? "border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-900/10" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`;
       const guestMetricCard = (label, value, toneClass) => /* @__PURE__ */ React.createElement("div", { className: `rounded-[1.2rem] border p-4 shadow-sm ${toneClass}` }, [
         /* @__PURE__ */ React.createElement("p", { key: "label", className: "text-[11px] font-black uppercase tracking-[0.16em] text-slate-500" }, label),
@@ -11885,8 +11927,8 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
       const dashboardPreview = /* @__PURE__ */ React.createElement("div", { className: "space-y-5" }, [
         /* @__PURE__ */ React.createElement("div", { key: "hero", className: "rounded-[1.8rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-sm sm:p-6" }, [
           /* @__PURE__ */ React.createElement("div", { key: "badge", className: "inline-flex items-center rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-black text-emerald-700" }, [/* @__PURE__ */ React.createElement(Eye, { key: "icon", className: "mr-1.5 h-4 w-4" }), "โหมดผู้เยี่ยมชม"]),
-          /* @__PURE__ */ React.createElement("h2", { key: "title", className: "mt-3 text-2xl font-black tracking-tight text-slate-900" }, "ดูภาพรวมระบบได้ก่อนเข้าสู่ระบบ"),
-          /* @__PURE__ */ React.createElement("p", { key: "desc", className: "mt-2 text-sm leading-6 text-slate-600" }, "หน้าแดชบอร์ด รายงาน และตรวจสอบคุณสมบัติเปิดให้ดูแบบอ่านอย่างเดียว ส่วนการบันทึก แก้ไข และจัดการข้อมูลยังคงต้องล็อกอินก่อนเสมอ")
+          /* @__PURE__ */ React.createElement("h2", { key: "title", className: "mt-3 text-2xl font-black tracking-tight text-slate-900" }, "ดูข้อมูลสาธารณะก่อนเข้าสู่ระบบ"),
+          /* @__PURE__ */ React.createElement("p", { key: "desc", className: "mt-2 text-sm leading-6 text-slate-600" }, "ระบบจะแสดงเฉพาะหน้าที่ผู้ดูแลระบบเปิดไว้ให้ผู้เยี่ยมชมทั่วไป ส่วนงานบันทึก แก้ไข และอนุมัติยังคงต้องเข้าสู่ระบบก่อนเสมอ")
         ]),
         /* @__PURE__ */ React.createElement("div", { key: "metrics", className: "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" }, [
           guestMetricCard("สมาชิกทั้งหมด", `${Number(stats.totalMembers || 0).toLocaleString()} คน`, "border-indigo-200 bg-indigo-50/70"),
@@ -11910,7 +11952,45 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
         /* @__PURE__ */ React.createElement("div", { key: "banner", className: "rounded-[1.4rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900" }, "เมนูนี้เปิดให้ตรวจสอบข้อมูลได้แบบอ่านอย่างเดียว โดยยังไม่สามารถแก้ไขหรือบันทึกข้อมูลใด ๆ ได้"),
         renderQualificationsView()
       ]);
-      const guestContent = guestActiveTab === "reports" ? reportsPreview : guestActiveTab === "qualifications" ? qualificationsPreview : dashboardPreview;
+      const membersPreview = /* @__PURE__ */ React.createElement("div", { className: "space-y-5" }, [
+        /* @__PURE__ */ React.createElement("div", { key: "hero", className: "rounded-[1.8rem] border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-cyan-50 p-5 shadow-sm sm:p-6" }, [
+          /* @__PURE__ */ React.createElement("h2", { key: "title", className: "text-2xl font-black tracking-tight text-slate-900" }, "ทะเบียนสมาชิกแบบอ่านอย่างเดียว"),
+          /* @__PURE__ */ React.createElement("p", { key: "desc", className: "mt-2 text-sm leading-6 text-slate-600" }, "เปิดให้ดูจำนวนสมาชิกและภาพรวมข้อมูลเบื้องต้นได้ แต่การเพิ่ม แก้ไข หรือลบข้อมูลยังต้องเข้าสู่ระบบตามสิทธิ์")
+        ]),
+        /* @__PURE__ */ React.createElement("div", { key: "metrics", className: "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" }, [
+          guestMetricCard("สมาชิกทั้งหมด", `${Number(stats.totalMembers || members.length || 0).toLocaleString()} คน`, "border-indigo-200 bg-indigo-50/70"),
+          guestMetricCard("สถานะใช้งาน", `${(Array.isArray(members) ? members.filter((member) => String(member && member.status || "").trim() === "ปกติ").length : 0).toLocaleString()} คน`, "border-emerald-200 bg-emerald-50/70"),
+          guestMetricCard("สัญญาที่ยังเปิดอยู่", `${activeLoans.length.toLocaleString()} สัญญา`, "border-sky-200 bg-sky-50/70")
+        ])
+      ]);
+      const loansPreview = /* @__PURE__ */ React.createElement("div", { className: "space-y-5" }, [
+        /* @__PURE__ */ React.createElement("div", { key: "hero", className: "rounded-[1.8rem] border border-cyan-200 bg-gradient-to-br from-cyan-50 via-white to-emerald-50 p-5 shadow-sm sm:p-6" }, [
+          /* @__PURE__ */ React.createElement("h2", { key: "title", className: "text-2xl font-black tracking-tight text-slate-900" }, "ภาพรวมสินเชื่อแบบอ่านอย่างเดียว"),
+          /* @__PURE__ */ React.createElement("p", { key: "desc", className: "mt-2 text-sm leading-6 text-slate-600" }, "ใช้ดูจำนวนสัญญา สถานะโดยรวม และยอดคงค้างได้ก่อนล็อกอิน ส่วนการอนุมัติและจัดการสัญญาต้องใช้บัญชีที่มีสิทธิ์")
+        ]),
+        /* @__PURE__ */ React.createElement("div", { key: "metrics", className: "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" }, [
+          guestMetricCard("สัญญาทั้งหมด", `${(Array.isArray(loans) ? loans.length : 0).toLocaleString()} รายการ`, "border-cyan-200 bg-cyan-50/70"),
+          guestMetricCard("สัญญาใช้งานอยู่", `${activeLoans.length.toLocaleString()} รายการ`, "border-emerald-200 bg-emerald-50/70"),
+          guestMetricCard("รออนุมัติ", `${pendingApprovalLoans.length.toLocaleString()} รายการ`, "border-amber-200 bg-amber-50/70"),
+          guestMetricCard("ยอดคงค้างรวม", formatCurrency(stats.activeLoans), "border-violet-200 bg-violet-50/70")
+        ])
+      ]);
+      const profilePreview = /* @__PURE__ */ React.createElement("div", { className: "space-y-5" }, [
+        /* @__PURE__ */ React.createElement("div", { key: "hero", className: "rounded-[1.8rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-slate-50 p-5 shadow-sm sm:p-6" }, [
+          /* @__PURE__ */ React.createElement("div", { key: "badge", className: "inline-flex items-center rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-black text-emerald-700" }, [/* @__PURE__ */ React.createElement(Lock, { key: "icon", className: "mr-1.5 h-4 w-4" }), "เข้าสู่ระบบ"]),
+          /* @__PURE__ */ React.createElement("h2", { key: "title", className: "mt-3 text-2xl font-black tracking-tight text-slate-900" }, "ล็อกอินเพื่อเข้าเมนูข้อมูลส่วนตัว"),
+          /* @__PURE__ */ React.createElement("p", { key: "desc", className: "mt-2 text-sm leading-6 text-slate-600" }, "เมื่อเข้าสู่ระบบสำเร็จ เมนูนี้จะเปลี่ยนกลับเป็น “ข้อมูลส่วนตัว” และสามารถจัดการข้อมูลบัญชีของตนเองได้ทันที")
+        ])
+      ]);
+      const guestContentMap = {
+        dashboard: dashboardPreview,
+        reports: reportsPreview,
+        qualifications: qualificationsPreview,
+        members: membersPreview,
+        loans: loansPreview,
+        profile: profilePreview
+      };
+      const guestContent = guestContentMap[guestActiveTab] || profilePreview;
       return /* @__PURE__ */ React.createElement("div", { className: "auth-ai-shell min-h-screen bg-slate-100 px-4 py-6 font-sans sm:px-6 lg:px-8" }, /* @__PURE__ */ React.createElement("div", { className: "mx-auto max-w-7xl space-y-5" }, [
         /* @__PURE__ */ React.createElement("div", { key: "topNotice", className: "rounded-[1.5rem] border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-900 shadow-sm" }, "เปิดหน้าเว็บแล้วสามารถดูเมนูทั่วไปได้ทันที ส่วนการทำรายการและแก้ไขข้อมูลยังต้องเข้าสู่ระบบก่อน"),
         /* @__PURE__ */ React.createElement("div", { key: "layout", className: "grid grid-cols-1 gap-5 xl:grid-cols-[260px_minmax(0,1fr)_420px]" }, [
@@ -11920,10 +12000,14 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
               /* @__PURE__ */ React.createElement("p", { key: "desc", className: "mt-1 text-xs leading-5 text-slate-300" }, "ดูข้อมูลภาพรวมระบบแบบอ่านอย่างเดียว")
             ]),
             /* @__PURE__ */ React.createElement("div", { key: "menu", className: "space-y-2" }, [
-              /* @__PURE__ */ React.createElement("button", { key: "dashboard", type: "button", onClick: () => setActiveTab("dashboard"), className: publicMenuClass("dashboard") }, [/* @__PURE__ */ React.createElement(LayoutDashboard, { key: "icon", className: "mb-2 h-5 w-5" }), /* @__PURE__ */ React.createElement("div", { key: "text" }, [/* @__PURE__ */ React.createElement("div", { key: "t", className: "font-black" }, "แดชบอร์ด"), /* @__PURE__ */ React.createElement("div", { key: "d", className: `mt-1 text-xs ${guestActiveTab === "dashboard" ? "text-slate-200" : "text-slate-500"}` }, "ดูภาพรวมตัวเลขสำคัญ")])]),
-              /* @__PURE__ */ React.createElement("button", { key: "reports", type: "button", onClick: () => setActiveTab("reports"), className: publicMenuClass("reports") }, [/* @__PURE__ */ React.createElement(FileText, { key: "icon", className: "mb-2 h-5 w-5" }), /* @__PURE__ */ React.createElement("div", { key: "text" }, [/* @__PURE__ */ React.createElement("div", { key: "t", className: "font-black" }, "รายงาน"), /* @__PURE__ */ React.createElement("div", { key: "d", className: `mt-1 text-xs ${guestActiveTab === "reports" ? "text-slate-200" : "text-slate-500"}` }, "ดูรายงานแบบอ่านอย่างเดียว")])]),
-              /* @__PURE__ */ React.createElement("button", { key: "qualifications", type: "button", onClick: () => setActiveTab("qualifications"), className: publicMenuClass("qualifications") }, [/* @__PURE__ */ React.createElement(UserCheck, { key: "icon", className: "mb-2 h-5 w-5" }), /* @__PURE__ */ React.createElement("div", { key: "text" }, [/* @__PURE__ */ React.createElement("div", { key: "t", className: "font-black" }, "ตรวจสอบคุณสมบัติ"), /* @__PURE__ */ React.createElement("div", { key: "d", className: `mt-1 text-xs ${guestActiveTab === "qualifications" ? "text-slate-200" : "text-slate-500"}` }, "ค้นหาและตรวจดูข้อมูลได้")])]),
-              /* @__PURE__ */ React.createElement("button", { key: "loginLink", type: "button", onClick: () => switchAuthView("login"), className: "w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left text-emerald-800 transition hover:bg-emerald-100" }, [/* @__PURE__ */ React.createElement(Lock, { key: "icon", className: "mb-2 h-5 w-5" }), /* @__PURE__ */ React.createElement("div", { key: "text" }, [/* @__PURE__ */ React.createElement("div", { key: "t", className: "font-black" }, "ล็อกอินเข้าสู่ระบบ"), /* @__PURE__ */ React.createElement("div", { key: "d", className: "mt-1 text-xs text-emerald-700" }, "เพื่อใช้งานเมนูแก้ไขและบันทึกข้อมูล")])])
+              ...guestMenuEntries.map((page) => {
+                const IconComp = page.icon;
+                return /* @__PURE__ */ React.createElement("button", { key: page.key, type: "button", onClick: () => setActiveTab(page.key), className: publicMenuClass(page.key) }, [/* @__PURE__ */ React.createElement(IconComp, { key: "icon", className: "mb-2 h-5 w-5" }), /* @__PURE__ */ React.createElement("div", { key: "text" }, [/* @__PURE__ */ React.createElement("div", { key: "t", className: "font-black" }, page.label), /* @__PURE__ */ React.createElement("div", { key: "d", className: `mt-1 text-xs ${guestActiveTab === page.key ? "text-slate-200" : "text-slate-500"}` }, page.hint)])]);
+              }),
+              /* @__PURE__ */ React.createElement("button", { key: "loginLink", type: "button", onClick: () => {
+                setActiveTab("profile");
+                switchAuthView("login");
+              }, className: publicMenuClass("profile") }, [/* @__PURE__ */ React.createElement(Lock, { key: "icon", className: "mb-2 h-5 w-5" }), /* @__PURE__ */ React.createElement("div", { key: "text" }, [/* @__PURE__ */ React.createElement("div", { key: "t", className: "font-black" }, "เข้าสู่ระบบ"), /* @__PURE__ */ React.createElement("div", { key: "d", className: `mt-1 text-xs ${guestActiveTab === "profile" ? "text-slate-200" : "text-slate-500"}` }, "ล็อกอินแล้วเมนูนี้จะเปลี่ยนเป็นข้อมูลส่วนตัว")])])
             ])
           ]),
           /* @__PURE__ */ React.createElement("main", { key: "preview", className: "min-w-0" }, guestContent),
@@ -12218,6 +12302,23 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
     if (!isAuthenticated) {
       return renderUnauthenticatedView();
     }
+    const sidebarMenuItems = [
+      { key: "dashboard", icon: LayoutDashboard, label: "ภาพรวม (Dashboard)", visible: true, onClick: () => setActiveTab("dashboard") },
+      { key: "payments", icon: Banknote, label: "รับชำระเงิน", visible: !!canAccessPaymentsTab, onClick: () => {
+        setActiveTab("payments");
+        setTimeout(() => {
+          var _a;
+          return (_a = searchInputRef.current) == null ? void 0 : _a.focus();
+        }, 100);
+      } },
+      { key: "payment_records", icon: Layers3, label: "จัดการรายการรับชำระ", visible: !!canViewPaymentRecords, onClick: () => setActiveTab("payment_records") },
+      { key: "qualifications", icon: UserCheck, label: "ตรวจสอบคุณสมบัติ", visible: true, onClick: () => setActiveTab("qualifications") },
+      { key: "members", icon: Users, label: "ทะเบียนสมาชิก", visible: !!canOpenMembersTab, onClick: () => setActiveTab("members") },
+      { key: "loans", icon: CreditCard, label: "จัดการสินเชื่อ", visible: !!canOpenLoansTab, onClick: () => setActiveTab("loans") },
+      { key: "reports", icon: FileText, label: "รายงาน (Reports)", visible: !!canViewReports, onClick: () => setActiveTab("reports") },
+      { key: "profile", icon: User, label: "ข้อมูลส่วนตัว", visible: true, onClick: () => setActiveTab("profile") },
+      { key: "settings", icon: Settings, label: "DevManager", visible: !!canAccessSettingsWorkspace, onClick: () => setActiveTab("settings") }
+    ].filter((item) => item.visible !== false);
     const hP = React.createElement;
     const paymentStickyTotal = (Number(payPrincipal || 0) || 0) + (Number(payInterest || 0) || 0);
     const paymentContextTransactions = Array.isArray(recentTransactions) ? recentTransactions.slice(0, selectedLoanForPay ? 6 : 8) : [];
@@ -12757,13 +12858,7 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
       renderPaymentRecentModal()
     ]);
 
-    return /* @__PURE__ */ React.createElement("div", { className: "ai-app-shell min-h-screen bg-slate-50 flex font-sans text-slate-800" }, showDataStatusBar && /* @__PURE__ */ React.createElement("div", { className: `ai-status-panel ai-status-panel-right no-print fixed top-3 right-3 z-[90] max-w-md w-[calc(100vw-1.5rem)] sm:w-auto px-4 py-2 rounded-2xl shadow-lg border backdrop-blur-md ${isConnectingInBackground ? "bg-white/95 border-amber-200 text-slate-700" : "bg-red-50/95 border-red-200 text-red-700"}` }, /* @__PURE__ */ React.createElement("div", { className: "flex items-start gap-2" }, /* @__PURE__ */ React.createElement("div", { className: `mt-0.5 shrink-0 ${isConnectingInBackground ? "text-amber-500" : "text-red-500"}` }, isConnectingInBackground ? /* @__PURE__ */ React.createElement(Loader2, { className: "w-4 h-4 animate-spin" }) : /* @__PURE__ */ React.createElement(AlertCircle, { className: "w-4 h-4" })), /* @__PURE__ */ React.createElement("div", { className: "min-w-0" }, /* @__PURE__ */ React.createElement("p", { className: "text-xs font-bold leading-5" }, isConnectingInBackground ? "กำลังเชื่อมต่อฐานข้อมูล" : "เชื่อมต่อฐานข้อมูลไม่สำเร็จ"), /* @__PURE__ */ React.createElement("p", { className: `text-[11px] leading-4 ${isConnectingInBackground ? "text-slate-500" : "text-red-600"}` }, isConnectingInBackground ? "ระบบกำลังดึงข้อมูลจาก Google Sheets เบื้องหลัง" : initialLoadError)))), showConnectivityStatusBar && /* @__PURE__ */ React.createElement("div", { className: `ai-status-panel ai-status-panel-left no-print fixed top-3 left-3 z-[90] max-w-md w-[calc(100vw-1.5rem)] sm:w-auto px-4 py-2 rounded-2xl shadow-lg border backdrop-blur-md ${!isOnline ? "bg-amber-50/95 border-amber-200 text-amber-800" : sessionHealth.status === "error" ? "bg-red-50/95 border-red-200 text-red-700" : "bg-blue-50/95 border-blue-200 text-blue-700"}` }, /* @__PURE__ */ React.createElement("div", { className: "flex items-start gap-2" }, /* @__PURE__ */ React.createElement("div", { className: `mt-0.5 shrink-0 ${!isOnline ? "text-amber-500" : sessionHealth.status === "error" ? "text-red-500" : "text-blue-500"}` }, !isOnline ? /* @__PURE__ */ React.createElement(AlertTriangle, { className: "w-4 h-4" }) : sessionHealth.status === "error" ? /* @__PURE__ */ React.createElement(AlertCircle, { className: "w-4 h-4" }) : /* @__PURE__ */ React.createElement(Loader2, { className: "w-4 h-4 animate-spin" })), /* @__PURE__ */ React.createElement("div", { className: "min-w-0" }, /* @__PURE__ */ React.createElement("p", { className: "text-xs font-bold leading-5" }, !isOnline ? "อุปกรณ์ออฟไลน์" : "สถานะการเชื่อมต่อ"), /* @__PURE__ */ React.createElement("p", { className: `text-[11px] leading-4 ${!isOnline ? "text-amber-700" : sessionHealth.status === "error" ? "text-red-600" : "text-blue-600"}` }, !isOnline ? "คุณยังดูข้อมูลเดิมได้ แต่การเชื่อมต่อฐานข้อมูลอาจล่าช้าหรือไม่สำเร็จ" : sessionHealth.message || "")))), /* @__PURE__ */ React.createElement("aside", { className: "ai-sidebar no-print group w-[4.5rem] hover:w-64 transition-all duration-300 ease-in-out bg-slate-900 text-slate-300 flex flex-col fixed h-full shadow-2xl z-50 overflow-x-hidden" }, /* @__PURE__ */ React.createElement("div", { className: "h-16 flex items-center px-4 bg-slate-950 border-b border-slate-800 whitespace-nowrap overflow-hidden" }, /* @__PURE__ */ React.createElement(ShieldCheck, { className: "w-8 h-8 text-emerald-500 shrink-0" }), /* @__PURE__ */ React.createElement("div", { className: "ml-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100" }, /* @__PURE__ */ React.createElement("h1", { className: "font-bold text-lg leading-tight text-white" }, "บ้านพิตำ"), /* @__PURE__ */ React.createElement("p", { className: "text-xs text-slate-400" }, "ระบบจัดการเงินกู้ V.2.0"))), /* @__PURE__ */ React.createElement("nav", { className: "flex-1 py-6 px-2 space-y-2 overflow-y-auto custom-scrollbar overflow-x-hidden" }, /* @__PURE__ */ React.createElement(SidebarItem, { icon: /* @__PURE__ */ React.createElement(LayoutDashboard, null), label: "ภาพรวม (Dashboard)", active: activeTab === "dashboard", onClick: () => setActiveTab("dashboard") }), /* @__PURE__ */ React.createElement(SidebarItem, { icon: /* @__PURE__ */ React.createElement(Banknote, null), label: "รับชำระเงิน", active: activeTab === "payments", onClick: () => {
-      setActiveTab("payments");
-      setTimeout(() => {
-        var _a;
-        return (_a = searchInputRef.current) == null ? void 0 : _a.focus();
-      }, 100);
-    } }), /* @__PURE__ */ React.createElement(SidebarItem, { icon: /* @__PURE__ */ React.createElement(Layers3, null), label: "จัดการรายการรับชำระ", active: activeTab === "payment_records", onClick: () => setActiveTab("payment_records") }), /* @__PURE__ */ React.createElement(SidebarItem, { icon: /* @__PURE__ */ React.createElement(UserCheck, null), label: "ตรวจสอบคุณสมบัติ", active: activeTab === "qualifications", onClick: () => setActiveTab("qualifications") }), /* @__PURE__ */ React.createElement(SidebarItem, { icon: /* @__PURE__ */ React.createElement(Users, null), label: "ทะเบียนสมาชิก", active: activeTab === "members", onClick: () => setActiveTab("members") }), /* @__PURE__ */ React.createElement(SidebarItem, { icon: /* @__PURE__ */ React.createElement(CreditCard, null), label: "จัดการสินเชื่อ", active: activeTab === "loans", onClick: () => setActiveTab("loans") }), /* @__PURE__ */ React.createElement(SidebarItem, { icon: /* @__PURE__ */ React.createElement(FileText, null), label: "รายงาน (Reports)", active: activeTab === "reports", onClick: () => setActiveTab("reports") }), /* @__PURE__ */ React.createElement(SidebarItem, { icon: /* @__PURE__ */ React.createElement(User, null), label: "ข้อมูลส่วนตัว", active: activeTab === "profile", onClick: () => setActiveTab("profile") }), /* @__PURE__ */ canAccessSettingsWorkspace && React.createElement(SidebarItem, { icon: /* @__PURE__ */ React.createElement(Settings, null), label: "DevManager", active: activeTab === "settings", onClick: () => setActiveTab("settings") })), /* @__PURE__ */ React.createElement("div", { className: "p-3 border-t border-slate-800 whitespace-nowrap overflow-hidden" }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
+    return /* @__PURE__ */ React.createElement("div", { className: "ai-app-shell min-h-screen bg-slate-50 flex font-sans text-slate-800" }, showDataStatusBar && /* @__PURE__ */ React.createElement("div", { className: `ai-status-panel ai-status-panel-right no-print fixed top-3 right-3 z-[90] max-w-md w-[calc(100vw-1.5rem)] sm:w-auto px-4 py-2 rounded-2xl shadow-lg border backdrop-blur-md ${isConnectingInBackground ? "bg-white/95 border-amber-200 text-slate-700" : "bg-red-50/95 border-red-200 text-red-700"}` }, /* @__PURE__ */ React.createElement("div", { className: "flex items-start gap-2" }, /* @__PURE__ */ React.createElement("div", { className: `mt-0.5 shrink-0 ${isConnectingInBackground ? "text-amber-500" : "text-red-500"}` }, isConnectingInBackground ? /* @__PURE__ */ React.createElement(Loader2, { className: "w-4 h-4 animate-spin" }) : /* @__PURE__ */ React.createElement(AlertCircle, { className: "w-4 h-4" })), /* @__PURE__ */ React.createElement("div", { className: "min-w-0" }, /* @__PURE__ */ React.createElement("p", { className: "text-xs font-bold leading-5" }, isConnectingInBackground ? "กำลังเชื่อมต่อฐานข้อมูล" : "เชื่อมต่อฐานข้อมูลไม่สำเร็จ"), /* @__PURE__ */ React.createElement("p", { className: `text-[11px] leading-4 ${isConnectingInBackground ? "text-slate-500" : "text-red-600"}` }, isConnectingInBackground ? "ระบบกำลังดึงข้อมูลจาก Google Sheets เบื้องหลัง" : initialLoadError)))), showConnectivityStatusBar && /* @__PURE__ */ React.createElement("div", { className: `ai-status-panel ai-status-panel-left no-print fixed top-3 left-3 z-[90] max-w-md w-[calc(100vw-1.5rem)] sm:w-auto px-4 py-2 rounded-2xl shadow-lg border backdrop-blur-md ${!isOnline ? "bg-amber-50/95 border-amber-200 text-amber-800" : sessionHealth.status === "error" ? "bg-red-50/95 border-red-200 text-red-700" : "bg-blue-50/95 border-blue-200 text-blue-700"}` }, /* @__PURE__ */ React.createElement("div", { className: "flex items-start gap-2" }, /* @__PURE__ */ React.createElement("div", { className: `mt-0.5 shrink-0 ${!isOnline ? "text-amber-500" : sessionHealth.status === "error" ? "text-red-500" : "text-blue-500"}` }, !isOnline ? /* @__PURE__ */ React.createElement(AlertTriangle, { className: "w-4 h-4" }) : sessionHealth.status === "error" ? /* @__PURE__ */ React.createElement(AlertCircle, { className: "w-4 h-4" }) : /* @__PURE__ */ React.createElement(Loader2, { className: "w-4 h-4 animate-spin" })), /* @__PURE__ */ React.createElement("div", { className: "min-w-0" }, /* @__PURE__ */ React.createElement("p", { className: "text-xs font-bold leading-5" }, !isOnline ? "อุปกรณ์ออฟไลน์" : "สถานะการเชื่อมต่อ"), /* @__PURE__ */ React.createElement("p", { className: `text-[11px] leading-4 ${!isOnline ? "text-amber-700" : sessionHealth.status === "error" ? "text-red-600" : "text-blue-600"}` }, !isOnline ? "คุณยังดูข้อมูลเดิมได้ แต่การเชื่อมต่อฐานข้อมูลอาจล่าช้าหรือไม่สำเร็จ" : sessionHealth.message || "")))), /* @__PURE__ */ React.createElement("aside", { className: "ai-sidebar no-print group w-[4.5rem] hover:w-64 transition-all duration-300 ease-in-out bg-slate-900 text-slate-300 flex flex-col fixed h-full shadow-2xl z-50 overflow-x-hidden" }, /* @__PURE__ */ React.createElement("div", { className: "h-16 flex items-center px-4 bg-slate-950 border-b border-slate-800 whitespace-nowrap overflow-hidden" }, /* @__PURE__ */ React.createElement(ShieldCheck, { className: "w-8 h-8 text-emerald-500 shrink-0" }), /* @__PURE__ */ React.createElement("div", { className: "ml-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100" }, /* @__PURE__ */ React.createElement("h1", { className: "font-bold text-lg leading-tight text-white" }, "บ้านพิตำ"), /* @__PURE__ */ React.createElement("p", { className: "text-xs text-slate-400" }, "ระบบจัดการเงินกู้ V.2.0"))), /* @__PURE__ */ React.createElement("nav", { className: "flex-1 py-6 px-2 space-y-2 overflow-y-auto custom-scrollbar overflow-x-hidden" }, sidebarMenuItems.map((item) => /* @__PURE__ */ React.createElement(SidebarItem, { key: item.key, icon: /* @__PURE__ */ React.createElement(item.icon, null), label: item.label, active: activeTab === item.key, onClick: item.onClick }))), /* @__PURE__ */ React.createElement("div", { className: "p-3 border-t border-slate-800 whitespace-nowrap overflow-hidden" }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
       if (typeof google !== "undefined" && google.script && google.script.run) {
         try {
           google.script.run.logoutCurrentSession();
@@ -14456,6 +14551,39 @@ const loadNotificationHistory = (forceReload = false) => {
                     h("span", { key: "state", className: `rounded-full px-2.5 py-1 text-[10px] font-bold ${active ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500"}` }, active ? "เปิด" : "ปิด")
                   ]),
                   h("p", { key: "hint", className: `mt-1 text-xs leading-5 ${active ? "text-emerald-700" : "text-slate-500"}` }, effect.hint)
+                ]);
+              }))
+            ]),
+            h("div", { key: "guestAccess", className: "mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4" }, [
+              h("div", { key: "head" }, [
+                h("h4", { key: "title", className: "text-base font-bold text-slate-800" }, "เมนูที่เปิดให้ผู้เยี่ยมชมทั่วไป"),
+                h("p", { key: "hint", className: "mt-1 text-sm text-slate-500" }, "เลือกเฉพาะหน้าที่ต้องการให้เห็นก่อนล็อกอิน เมนูที่ไม่ได้เปิดไว้จะไม่แสดงเลย ส่วนเมนู “เข้าสู่ระบบ” จะแสดงให้อัตโนมัติ")
+              ]),
+              h("div", { key: "grid", className: "mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" }, publicPageOptions.map((page) => {
+                const active = !!((safeMenuSettings.publicPages || {})[page.key]);
+                const IconComp = page.icon;
+                return h("button", {
+                  key: page.key,
+                  type: "button",
+                  disabled: !canManageSettings,
+                  onClick: () => applyMenuPatch({
+                    publicPages: {
+                      ...(safeMenuSettings.publicPages || {}),
+                      [page.key]: !active
+                    }
+                  }),
+                  className: `rounded-xl border p-3 text-left transition-all ${active ? "border-cyan-300 bg-cyan-50 text-cyan-900" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"} ${!canManageSettings ? "opacity-70 cursor-not-allowed" : ""}`
+                }, [
+                  h("div", { key: "row", className: "flex items-start justify-between gap-3" }, [
+                    h("div", { key: "left", className: "flex items-start gap-2" }, [
+                      h("span", { key: "iconWrap", className: `mt-0.5 rounded-lg p-2 ${active ? "bg-cyan-100 text-cyan-700" : "bg-slate-100 text-slate-500"}` }, h(IconComp, { className: "w-4 h-4" })),
+                      h("div", { key: "copy", className: "min-w-0" }, [
+                        h("p", { key: "label", className: "font-bold text-sm" }, page.label),
+                        h("p", { key: "hint", className: `mt-1 text-xs leading-5 ${active ? "text-cyan-700" : "text-slate-500"}` }, page.hint)
+                      ])
+                    ]),
+                    h("span", { key: "state", className: `rounded-full px-2.5 py-1 text-[10px] font-bold ${active ? "bg-cyan-600 text-white" : "bg-slate-100 text-slate-500"}` }, active ? "สาธารณะ" : "ล็อกไว้")
+                  ])
                 ]);
               }))
             ]),
