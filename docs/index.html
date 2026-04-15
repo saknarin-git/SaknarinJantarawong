@@ -6414,9 +6414,7 @@ const getQuickOverviewToneClass = (tone) => {
         return;
       }
       const form = e.target;
-      const usernameField = form && form.username ? form.username : null;
       const pinField = form && form.pin ? form.pin : null;
-      const username = usernameField ? String(usernameField.value || "").trim() : "";
       const pin = String(pinField ? pinField.value || "" : "").replace(/\D/g, "").slice(0, 6);
       if (pinField && pinField.value !== pin) pinField.value = pin;
       setLoginPin(pin);
@@ -6430,7 +6428,7 @@ const getQuickOverviewToneClass = (tone) => {
         google.script.run.withSuccessHandler((response) => {
           const result = typeof response === "string" ? { status: response } : response || {};
           if (result.status === "Success") {
-            const normalizedUsername = String((result == null ? void 0 : result.username) || username || "admin").trim() || "admin";
+            const normalizedUsername = String((result == null ? void 0 : result.username) || "admin").trim() || "admin";
             const normalizedFullName = String((result == null ? void 0 : result.fullName) || normalizedUsername || "").trim();
             const normalizedEmail = String((result == null ? void 0 : result.email) || "").trim().toLowerCase();
             const normalizedRole = String((result == null ? void 0 : result.role) || "staff").trim().toLowerCase();
@@ -6474,7 +6472,7 @@ const getQuickOverviewToneClass = (tone) => {
           if (pinField && typeof pinField.focus === "function") pinField.focus();
           resetClientSession(loginErrorMessage);
           setIsLoading(false);
-        }).verifyLoginPin(username, pin);
+        }).verifyLoginPin(pin);
       } else {
         setAuthNotice({ type: "error", message: "ไม่สามารถเชื่อมต่อระบบเพื่อเข้าสู่ระบบได้" });
         setIsLoading(false);

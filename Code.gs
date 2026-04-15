@@ -5816,14 +5816,26 @@ function deleteMember(memberId) {
 // ==========================================
 
 
-function verifyLoginPin(username, pin) {
+function verifyLoginPin(pinOrUsername, pinMaybe) {
   var ss = getDatabaseSpreadsheet_();
   var usersSheet = ensureUsersSheet_(ss);
-  var normalizedUsername = normalizeUsername_(username);
-  var normalizedPin = normalizePinInput_(pin);
+  var normalizedUsername = '';
+  var normalizedPin = '';
 
-  if (!normalizedPin && isValidSixDigitPin_(username)) {
-    normalizedPin = normalizePinInput_(username);
+  if (pinMaybe !== undefined && pinMaybe !== null && String(pinMaybe || '').trim() !== '') {
+    normalizedUsername = normalizeUsername_(pinOrUsername);
+    normalizedPin = normalizePinInput_(pinMaybe);
+  } else {
+    var firstArg = String(pinOrUsername || '').trim();
+    if (isValidSixDigitPin_(firstArg)) {
+      normalizedPin = normalizePinInput_(firstArg);
+    } else {
+      normalizedUsername = normalizeUsername_(firstArg);
+    }
+  }
+
+  if (!normalizedPin && isValidSixDigitPin_(pinOrUsername)) {
+    normalizedPin = normalizePinInput_(pinOrUsername);
     normalizedUsername = '';
   }
 
