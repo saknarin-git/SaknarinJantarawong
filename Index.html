@@ -12262,10 +12262,10 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
       }));
     };
     const renderNormalPaymentSearchCard = () => hP("div", { className: "ai-payment-search-card bg-white p-4 rounded-2xl shadow-sm border border-slate-200", style: { overflow: "visible" } }, [
-      hP("div", { key: "search", className: "relative z-[80]", style: { overflow: "visible" } }, [
+      hP("div", { key: "search", className: "relative z-[1]", style: { overflow: "visible" } }, [
         hP("input", { key: "input", id: "payment-member-search", ref: searchInputRef, type: "text", value: paySearchQuery, onChange: (e) => setPaySearchQuery(e.target.value), onKeyDown: handleSearchKeyDown, placeholder: isFastPaymentLookupLoading ? "กำลังค้นหาข้อมูลสมาชิก..." : "พิมพ์รหัสสมาชิกหรือชื่อสมาชิก แล้วกด Enter...", className: `ai-payment-focus-input is-strong w-full pl-4 pr-4 py-4 border-2 ${searchError ? "border-red-300 focus:border-red-500 focus:ring-red-500/20 bg-red-50" : "border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500/20 bg-white"} rounded-xl focus:bg-white focus:ring-4 outline-none transition-all shadow-inner`, autoFocus: true, disabled: isFastPaymentLookupLoading, autoComplete: "off" }),
         searchError ? hP("p", { key: "error", className: "absolute text-red-500 font-medium mt-2 text-sm flex items-center" }, [hP(AlertCircle, { key: "icon", className: "w-4 h-4 mr-1" }), " ", searchError]) : null,
-        paySuggestions.length > 0 && !searchError ? hP("div", { key: "suggestions", className: "absolute left-0 right-0 top-full mt-2 max-h-[320px] overflow-y-auto rounded-2xl border-2 border-emerald-200 bg-white shadow-[0_24px_60px_-20px_rgba(15,23,42,0.35)] z-[95] ring-1 ring-white" }, paySuggestions.map((loan, idx) => hP("button", { key: `${loan.contract || loan.memberId || idx}-${idx}`, type: "button", onMouseDown: (e) => {
+        paySuggestions.length > 0 && !searchError && !showPaymentHelpModal && !showPaymentRecentModal && !duplicateMemberPaymentState.open ? hP("div", { key: "suggestions", className: "absolute left-0 right-0 top-full mt-2 max-h-[320px] overflow-y-auto rounded-2xl border-2 border-emerald-200 bg-white shadow-[0_24px_60px_-20px_rgba(15,23,42,0.35)] z-[35] ring-1 ring-white" }, paySuggestions.map((loan, idx) => hP("button", { key: `${loan.contract || loan.memberId || idx}-${idx}`, type: "button", onMouseDown: (e) => {
           e.preventDefault();
           handleDuplicateMemberPaymentLookup(loan.memberId, loan.member);
         }, className: "w-full px-5 py-4 text-left hover:bg-emerald-50 border-b border-slate-100 last:border-0 transition-colors" }, [
@@ -12563,7 +12563,7 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
         hP("button", { key: "submit", type: "button", onClick: () => { const submitEl = document.getElementById("payment-submit-button"); if (submitEl && typeof submitEl.click === "function") submitEl.click(); }, disabled: isProcessingPayment, className: "px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black shadow-lg transition-all disabled:opacity-50 min-w-[13rem]" }, isProcessingPayment ? (normalPaymentEditContext ? "กำลังอัปเดต..." : "กำลังบันทึก...") : (normalPaymentEditContext ? "แสดงสมุดคู่ฝากเพื่ออัปเดต" : "แสดงสมุดคู่ฝาก"))
       ])
     ]) : null;
-    const renderPaymentHelpModal = () => showPaymentHelpModal ? hP("div", { className: "fixed inset-0 z-[72] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" }, [
+    const renderPaymentHelpModal = () => showPaymentHelpModal ? hP("div", { className: "fixed inset-0 z-[125] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" }, [
       hP("div", { key: "panel", className: "ai-payment-modal-shell ai-entity-modal-panel bg-white rounded-2xl shadow-2xl overflow-hidden" }, [
         hP("div", { key: "head", className: "ai-payment-modal-header px-6 py-5 flex items-center justify-between gap-3" }, [
           hP("div", { key: "text" }, [
@@ -12586,7 +12586,7 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
         ])
       ])
     ]) : null;
-    const renderPaymentRecentModal = () => showPaymentRecentModal ? hP("div", { className: "fixed inset-0 z-[71] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" }, [
+    const renderPaymentRecentModal = () => showPaymentRecentModal ? hP("div", { className: "fixed inset-0 z-[124] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" }, [
       hP("div", { key: "panel", className: "ai-payment-modal-shell ai-entity-modal-panel bg-white rounded-2xl shadow-2xl overflow-hidden" }, [
         hP("div", { key: "head", className: "ai-payment-modal-header px-6 py-5 flex items-center justify-between gap-3" }, [
           hP("div", { key: "text" }, [
@@ -12604,7 +12604,7 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
         ])
       ])
     ]) : null;
-    const renderDuplicateMemberPaymentModal = () => duplicateMemberPaymentState.open ? hP("div", { className: "fixed inset-0 z-[73] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4", onKeyDown: handleDuplicateMemberPaymentModalKeyDown }, [
+    const renderDuplicateMemberPaymentModal = () => duplicateMemberPaymentState.open ? hP("div", { className: "fixed inset-0 z-[126] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4", onKeyDown: handleDuplicateMemberPaymentModalKeyDown }, [
       hP("div", { key: "panel", className: "ai-payment-modal-shell ai-entity-modal-panel bg-white rounded-2xl shadow-2xl overflow-hidden max-w-4xl w-full", tabIndex: -1 }, [
         hP("div", { key: "head", className: "ai-payment-modal-header px-6 py-5 flex items-center justify-between gap-3" }, [
           hP("div", { key: "text" }, [
@@ -12685,17 +12685,17 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
           hP("h3", { key: "title", className: "text-2xl font-black leading-tight text-blue-700" }, "หน้ารับชำระเงิน"),
           hP("p", { key: "subtitle", className: "text-sm font-medium text-slate-500" }, paymentMode === "normal" ? "แท็บปัจจุบัน: รับชำระปกติ" : "แท็บปัจจุบัน: กลบหนี้")
         ]),
-        hP("div", { key: "toolbar-actions", className: "ai-payments-toolbar-actions" }, [
-          paymentMode === "normal" ? hP("button", { key: "help", type: "button", onClick: () => setShowPaymentHelpModal(true), className: "inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all" }, [hP(Sparkles, { key: "icon", className: "w-4 h-4 mr-2 text-cyan-500" }), "วิธีใช้งานย่อ"]) : null,
-          paymentMode === "normal" ? hP("button", { key: "recent", type: "button", onClick: () => setShowPaymentRecentModal(true), className: "inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all" }, [hP(Eye, { key: "icon", className: "w-4 h-4 mr-2 text-violet-500" }), "ดูรายการวันนี้"]) : null,
-          paymentMode === "normal" && (canRunBackup || canRequestApprovals) ? hP("button", { key: "archive", type: "button", onClick: handleMigrateYearlyArchivesToMonthly, disabled: archiveMigrationStatus.type === "loading", className: `inline-flex items-center rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${archiveMigrationStatus.type === "loading" ? "bg-violet-100 text-violet-400 cursor-not-allowed" : "bg-violet-600 text-white hover:bg-violet-700 shadow-sm"}` }, [archiveMigrationStatus.type === "loading" ? hP(RefreshCw, { key: "iconLoading", className: "w-4 h-4 mr-2 animate-spin" }) : hP(Database, { key: "iconReady", className: "w-4 h-4 mr-2" }), archiveMigrationStatus.type === "loading" ? "กำลัง Backup..." : (!canRunBackup && canRequestApprovals ? "ส่งคำขออนุมัติ Backup" : "BackUp ธุรกรรม")]) : null,
-          paymentMode === "normal" && (canCloseAccounting || canRequestApprovals) ? hP("button", { key: "closeAccounting", type: "button", onClick: handleCloseDayEnd, disabled: dayCloseStatus.type === "loading", className: `inline-flex items-center rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${dayCloseStatus.type === "loading" ? "bg-indigo-100 text-indigo-400 cursor-not-allowed" : "bg-indigo-700 text-white hover:bg-indigo-800 shadow-sm"}` }, [dayCloseStatus.type === "loading" ? hP(RefreshCw, { key: "iconLoading", className: "w-4 h-4 mr-2 animate-spin" }) : hP(CheckCircle2, { key: "iconReady", className: "w-4 h-4 mr-2" }), !canCloseAccounting && canRequestApprovals ? "ส่งคำขออนุมัติปิดยอดบัญชี" : "ปิดยอดบัญชี"]) : null,
-          hP("div", { key: "modeWrap", className: "shrink-0" }, [
+        hP("div", { key: "toolbar-actions", className: "ai-payments-toolbar-actions flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-1" }, [
+          hP("div", { key: "modeWrap", className: "shrink-0 inline-flex" }, [
             hP("div", { key: "mode", className: "flex items-center bg-slate-100 rounded-xl border border-slate-200 p-1 gap-1 relative z-0" }, [
               hP("button", { key: "normal", type: "button", onClick: () => { setPaymentMode("normal"); resetOffsetScreen(); }, className: `py-2 px-5 rounded-lg font-bold text-sm transition-all flex items-center gap-1.5 whitespace-nowrap ${paymentMode === "normal" ? "bg-emerald-600 text-white shadow" : "text-slate-500 hover:bg-white"}` }, [hP(CreditCard, { key: "icon", className: "w-4 h-4" }), "ชำระปกติ"]),
               hP("button", { key: "offset", type: "button", onClick: () => { setPaymentMode("offset"); resetPaymentScreen(); }, className: `py-2 px-5 rounded-lg font-bold text-sm transition-all flex items-center gap-1.5 whitespace-nowrap ${paymentMode === "offset" ? "bg-amber-500 text-white shadow" : "text-slate-500 hover:bg-white"}` }, [hP(FileText, { key: "icon", className: "w-4 h-4" }), "กลบหนี้"])
             ])
-          ])
+          ]),
+          paymentMode === "normal" ? hP("button", { key: "recent", type: "button", onClick: () => setShowPaymentRecentModal(true), className: "shrink-0 inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all whitespace-nowrap" }, [hP(Eye, { key: "icon", className: "w-4 h-4 mr-2 text-violet-500" }), "ดูรายการวันนี้"]) : null,
+          paymentMode === "normal" && (canRunBackup || canRequestApprovals) ? hP("button", { key: "archive", type: "button", onClick: handleMigrateYearlyArchivesToMonthly, disabled: archiveMigrationStatus.type === "loading", className: `shrink-0 inline-flex items-center rounded-xl px-4 py-2.5 text-sm font-bold transition-all whitespace-nowrap ${archiveMigrationStatus.type === "loading" ? "bg-violet-100 text-violet-400 cursor-not-allowed" : "bg-violet-600 text-white hover:bg-violet-700 shadow-sm"}` }, [archiveMigrationStatus.type === "loading" ? hP(RefreshCw, { key: "iconLoading", className: "w-4 h-4 mr-2 animate-spin" }) : hP(Database, { key: "iconReady", className: "w-4 h-4 mr-2" }), archiveMigrationStatus.type === "loading" ? "กำลัง Backup..." : (!canRunBackup && canRequestApprovals ? "ส่งคำขออนุมัติ Backup" : "BackUp ธุรกรรม")]) : null,
+          paymentMode === "normal" && (canCloseAccounting || canRequestApprovals) ? hP("button", { key: "closeAccounting", type: "button", onClick: handleCloseDayEnd, disabled: dayCloseStatus.type === "loading", className: `shrink-0 inline-flex items-center rounded-xl px-4 py-2.5 text-sm font-bold transition-all whitespace-nowrap ${dayCloseStatus.type === "loading" ? "bg-indigo-100 text-indigo-400 cursor-not-allowed" : "bg-indigo-700 text-white hover:bg-indigo-800 shadow-sm"}` }, [dayCloseStatus.type === "loading" ? hP(RefreshCw, { key: "iconLoading", className: "w-4 h-4 mr-2 animate-spin" }) : hP(CheckCircle2, { key: "iconReady", className: "w-4 h-4 mr-2" }), !canCloseAccounting && canRequestApprovals ? "ส่งคำขออนุมัติปิดยอดบัญชี" : "ปิดยอดบัญชี"]) : null,
+          paymentMode === "normal" ? hP("button", { key: "help", type: "button", onClick: () => setShowPaymentHelpModal(true), className: "shrink-0 inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all whitespace-nowrap" }, [hP(Sparkles, { key: "icon", className: "w-4 h-4 mr-2 text-cyan-500" }), "วิธีใช้งานย่อ"]) : null
         ])
       ]),
       paymentMode === "normal" && (archiveMigrationStatus.type !== "idle" || dayCloseStatus.type !== "idle") ? hP("div", { key: "opsStatus", className: "grid grid-cols-1 gap-3 lg:grid-cols-2" }, [
