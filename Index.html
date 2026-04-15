@@ -15070,7 +15070,7 @@ const loadNotificationHistory = (forceReload = false) => {
   :root {
     --ai-menu-panel-width: min(380px, 92vw);
     --ai-menu-toggle-size: 62px;
-    --ai-menu-brand-width: 188px;
+    --ai-menu-brand-width: 172px;
     --ai-menu-bottom-height: 86px;
     --ai-menu-ease: cubic-bezier(0.22, 1, 0.36, 1);
   }
@@ -15109,9 +15109,12 @@ const loadNotificationHistory = (forceReload = false) => {
 
   .ai-sidebar {
     position: fixed !important;
-    inset: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: auto !important;
+    height: auto !important;
     background: transparent !important;
     box-shadow: none !important;
     overflow: visible !important;
@@ -15129,7 +15132,7 @@ const loadNotificationHistory = (forceReload = false) => {
   }
 
   .ai-topbar h2 {
-    padding-left: calc(var(--ai-menu-brand-width) + 18px) !important;
+    padding-left: calc(var(--ai-menu-brand-width) + 22px) !important;
     min-height: 64px;
     display: flex;
     align-items: center;
@@ -15153,7 +15156,7 @@ const loadNotificationHistory = (forceReload = false) => {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    padding: 0 14px 0 54px !important;
+    padding: 0 12px 0 50px !important;
     pointer-events: auto;
     cursor: pointer;
     user-select: none;
@@ -15181,6 +15184,7 @@ const loadNotificationHistory = (forceReload = false) => {
     opacity: 1 !important;
     margin-left: 0 !important;
     min-width: 0;
+    max-width: calc(var(--ai-menu-brand-width) - 62px);
     pointer-events: none;
   }
 
@@ -15257,6 +15261,7 @@ const loadNotificationHistory = (forceReload = false) => {
     pointer-events: auto;
     opacity: 0;
     visibility: hidden;
+    display: none !important;
     transition: transform 0.42s var(--ai-menu-ease), opacity 0.28s ease, visibility 0.28s ease, background 0.28s ease;
     z-index: 141;
   }
@@ -15372,6 +15377,14 @@ const loadNotificationHistory = (forceReload = false) => {
     opacity: 1;
     visibility: visible;
     transform: none;
+  }
+
+  body.ai-menu-open .ai-sidebar > nav {
+    display: grid !important;
+  }
+
+  body.ai-menu-open .ai-sidebar > div:last-child {
+    display: flex !important;
   }
 
   body[data-menu-mode="push-drawer"].ai-menu-open .ai-main-shell,
