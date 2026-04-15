@@ -4752,7 +4752,8 @@ function buildAppRuntimeSnapshot_(ss, now) {
       lastClosedAccountingMonth: lastClosedAccountingMonth,
       lastClosedAccountingAt: lastClosedAccountingAt,
       operatingDayCalendar: operatingDayCalendar,
-      reportLayoutSettings: getReportLayoutSettings_(settingsSheet)
+      reportLayoutSettings: getReportLayoutSettings_(settingsSheet),
+      menuSettings: getMenuSettings_(settingsSheet)
     }
   };
 }
@@ -4790,7 +4791,8 @@ function getAppData() {
       lastClosedAccountingMonth: String(cachedSettings.lastClosedAccountingMonth || '').trim(),
       lastClosedAccountingAt: String(cachedSettings.lastClosedAccountingAt || '').trim(),
       operatingDayCalendar: normalizeOperatingDayCalendar_(cachedSettings.operatingDayCalendar),
-      reportLayoutSettings: normalizeReportLayoutSettings_(cachedSettings.reportLayoutSettings)
+      reportLayoutSettings: normalizeReportLayoutSettings_(cachedSettings.reportLayoutSettings),
+      menuSettings: normalizeMenuSettings_(cachedSettings.menuSettings)
     };
     return cachedData;
   }
@@ -4804,6 +4806,7 @@ function getAppData() {
   var lastClosedAccountingAt = settingsSheet ? String(getSettingValue_(settingsSheet, 'LastClosedAccountingAt') || '').trim() : '';
   var operatingDayCalendar = settingsSheet ? getOperatingDayCalendar_(settingsSheet) : {};
   var reportLayoutSettings = settingsSheet ? getReportLayoutSettings_(settingsSheet) : cloneReportLayoutDefaults_();
+  var menuSettings = settingsSheet ? getMenuSettings_(settingsSheet) : cloneMenuSettingsDefaults_();
 
   var loanSheet = ss.getSheetByName("Loans");
   var loanRows = [];
@@ -4970,7 +4973,8 @@ function getAppData() {
       lastClosedAccountingMonth: lastClosedAccountingMonth,
       lastClosedAccountingAt: lastClosedAccountingAt,
       operatingDayCalendar: operatingDayCalendar,
-      reportLayoutSettings: reportLayoutSettings
+      reportLayoutSettings: reportLayoutSettings,
+      menuSettings: menuSettings
     }
   };
 
@@ -6600,6 +6604,7 @@ function getCloseAccountingReferenceContext_(settingsSheet, referenceDate) {
 }
 
 var REPORT_LAYOUT_SETTINGS_KEY_ = 'ReportLayoutSettingsJson';
+var MENU_SETTINGS_KEY_ = 'MenuSettingsJson';
 var REPORT_LAYOUT_DEFAULTS_ = {
   pageMarginsCm: { top: 0.3, right: 0.18, bottom: 0.3, left: 0.18 },
   columnWidths: {
@@ -6672,6 +6677,86 @@ function normalizeReportLayoutSettings_(rawValue) {
 function getReportLayoutSettings_(settingsSheet) {
   if (!settingsSheet) return cloneReportLayoutDefaults_();
   return normalizeReportLayoutSettings_(getSettingValue_(settingsSheet, REPORT_LAYOUT_SETTINGS_KEY_));
+}
+
+function cloneMenuSettingsDefaults_() {
+  return {
+    primaryMode: 'slide-left',
+    drawerSide: 'left',
+    morphToX: true,
+    backdropBlur: true,
+    glassmorphism: true,
+    staggeredItems: true,
+    bounceToggle: true,
+    elasticDrawer: true,
+    rippleClick: true,
+    hoverUnderline: true,
+    iconRotate: true
+  };
+}
+
+function normalizeMenuSettings_(rawValue) {
+  var defaults = cloneMenuSettingsDefaults_();
+  var source = rawValue;
+
+  if (source === null || source === undefined || source === '') {
+    return defaults;
+  }
+
+  if (typeof source === 'string') {
+    var textValue = String(source || '').trim();
+    if (!textValue) return defaults;
+    try {
+      source = JSON.parse(textValue);
+    } catch (e) {
+      return defaults;
+    }
+  }
+
+  if (Object.prototype.toString.call(source) !== '[object Object]') return defaults;
+
+  var allowedModes = {
+    'slide-left': true,
+    'slide-right': true,
+    'drop-down': true,
+    'push-drawer': true,
+    'overlay-menu': true,
+    'fullscreen-menu': true,
+    'fade-in-menu': true,
+    'zoom-in-menu': true,
+    'flip-3d-menu': true
+  };
+  var allowedSides = { left: true, right: true };
+  var normalizedMode = String(source.primaryMode || defaults.primaryMode).trim();
+  if (!allowedModes[normalizedMode]) normalizedMode = defaults.primaryMode;
+
+  var normalizedSide = String(source.drawerSide || (normalizedMode === 'slide-right' ? 'right' : defaults.drawerSide)).trim().toLowerCase();
+  if (normalizedMode === 'slide-right') normalizedSide = 'right';
+  if (normalizedMode === 'slide-left') normalizedSide = 'left';
+  if (!allowedSides[normalizedSide]) normalizedSide = defaults.drawerSide;
+
+  var readBool = function(key) {
+    return Object.prototype.hasOwnProperty.call(source, key) ? !!source[key] : defaults[key];
+  };
+
+  return {
+    primaryMode: normalizedMode,
+    drawerSide: normalizedSide,
+    morphToX: readBool('morphToX'),
+    backdropBlur: readBool('backdropBlur'),
+    glassmorphism: readBool('glassmorphism'),
+    staggeredItems: readBool('staggeredItems'),
+    bounceToggle: readBool('bounceToggle'),
+    elasticDrawer: readBool('elasticDrawer'),
+    rippleClick: readBool('rippleClick'),
+    hoverUnderline: readBool('hoverUnderline'),
+    iconRotate: readBool('iconRotate')
+  };
+}
+
+function getMenuSettings_(settingsSheet) {
+  if (!settingsSheet) return cloneMenuSettingsDefaults_();
+  return normalizeMenuSettings_(getSettingValue_(settingsSheet, MENU_SETTINGS_KEY_));
 }
 
 function getOperatingDayCalendar() {
@@ -12189,10 +12274,11 @@ saveSettings = function(settingsStr) {
     var wantsNotificationSettings = hasOwn(settingsData, 'notificationSettings');
     var wantsInterestRate = hasOwn(settingsData, 'interestRate');
     var wantsReportLayoutSettings = hasOwn(settingsData, 'reportLayoutSettings');
+    var wantsMenuSettings = hasOwn(settingsData, 'menuSettings');
 
-    if (!wantsNotificationSettings && !wantsInterestRate && !wantsReportLayoutSettings) {
+    if (!wantsNotificationSettings && !wantsInterestRate && !wantsReportLayoutSettings && !wantsMenuSettings) {
       requirePermission_('settings.manage', 'ไม่มีสิทธิ์แก้ไขการตั้งค่าระบบ');
-    } else if (wantsInterestRate || wantsReportLayoutSettings) {
+    } else if (wantsInterestRate || wantsReportLayoutSettings || wantsMenuSettings) {
       requirePermission_('settings.manage', 'ไม่มีสิทธิ์แก้ไขการตั้งค่าระบบ');
     } else if (wantsNotificationSettings) {
       try {
@@ -12233,6 +12319,18 @@ saveSettings = function(settingsStr) {
         entityId: 'ReportLayoutSettings',
         after: normalizedReportLayoutSettings,
         details: 'อัปเดตระยะขอบกระดาษและความกว้างคอลัมน์รายงาน'
+      });
+    }
+
+    if (wantsMenuSettings) {
+      var normalizedMenuSettings = normalizeMenuSettings_(settingsData.menuSettings);
+      upsertSettingValue_(settingsSheet, MENU_SETTINGS_KEY_, JSON.stringify(normalizedMenuSettings));
+      appendAuditLogSafe_(ss, {
+        action: 'UPDATE_MENU_SETTINGS',
+        entityType: 'SETTINGS',
+        entityId: 'MenuSettings',
+        after: normalizedMenuSettings,
+        details: 'อัปเดตรูปแบบแฮมเบอร์เกอร์เมนูและเอฟเฟ็กต์การนำทาง'
       });
     }
 

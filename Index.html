@@ -3200,6 +3200,31 @@
       }
     }));
     const [reportLayoutStatus, setReportLayoutStatus] = useState({ type: "idle", message: "" });
+    const defaultMenuSettings = {
+      primaryMode: "slide-left",
+      drawerSide: "left",
+      morphToX: true,
+      backdropBlur: true,
+      glassmorphism: true,
+      staggeredItems: true,
+      bounceToggle: true,
+      elasticDrawer: true,
+      rippleClick: true,
+      hoverUnderline: true,
+      iconRotate: true
+    };
+    const [menuSettings, setMenuSettings] = useState(() => {
+      try {
+        if (typeof localStorage !== "undefined") {
+          const saved = JSON.parse(localStorage.getItem("menuSettings") || "null");
+          if (saved && typeof saved === "object") {
+            return { ...defaultMenuSettings, ...saved };
+          }
+        }
+      } catch (e) {}
+      return { ...defaultMenuSettings };
+    });
+    const [menuSettingsStatus, setMenuSettingsStatus] = useState({ type: "idle", message: "" });
     const [operatingDayYearBe, setOperatingDayYearBe] = useState(() => String((/* @__PURE__ */ new Date()).getFullYear() + 543));
     const [operatingDayMonth, setOperatingDayMonth] = useState(() => String((/* @__PURE__ */ new Date()).getMonth() + 1));
     const [operatingDayDate, setOperatingDayDate] = useState("");
@@ -3213,9 +3238,10 @@
     const [settingsWorkspaceSearch, setSettingsWorkspaceSearch] = useState("");
     const [settingsWorkspaceFilter, setSettingsWorkspaceFilter] = useState("all");
     const resolvedSettingsWorkspaceItemId = useMemo(() => {
-      const settingsCategories = ["account", "workflow", "finance", "database", "audit"];
+      const settingsCategories = ["account", "interface", "workflow", "finance", "database", "audit"];
       const settingsItems = [
                 { id: "userAdmin", categoryId: "account", title: "จัดการผู้ใช้", summary: "เพิ่ม แก้ไข role สถานะ และสิทธิ์ผู้ใช้งานในระบบ", badge: "สำคัญ", visible: !!canManageUsers, favorite: true, recent: true, risk: true },
+        { id: "menuAppearanceConfig", categoryId: "interface", title: "เมนูและการนำทาง", summary: "เลือกรูปแบบแฮมเบอร์เกอร์เมนูแบบเต็มความสูงและเอฟเฟ็กต์การแสดงผล", badge: "ปรับแต่ง UI", visible: !!(canManageSettings || canViewSettings), favorite: true, recent: true, risk: false },
         { id: "approvalDashboard", categoryId: "workflow", title: "ภาพรวมงานอนุมัติ", summary: "ดูภาพรวมคำขออนุมัติ รายการล่าสุด และสิ่งที่ต้องดำเนินการ", badge: "ใช้บ่อย", visible: !!(canViewApprovals || canManageApprovals), favorite: true, recent: true, risk: false },
         { id: "approvalQueue", categoryId: "workflow", title: "คิวงานอนุมัติ", summary: "อนุมัติ ปฏิเสธ หรือดูสถานะคำขอที่รอดำเนินการ", badge: "สำคัญ", visible: !!(canViewApprovals || canManageApprovals), favorite: true, recent: true, risk: true },
         { id: "notificationSettings", categoryId: "workflow", title: "ตั้งค่าการแจ้งเตือน", summary: "กำหนดผู้รับและเหตุการณ์ที่ต้องส่งอีเมลแจ้งเตือน", badge: "แอดมิน", visible: !!(canManageNotifications || canManageSettings), favorite: false, recent: true, risk: false },
@@ -3256,6 +3282,7 @@
     const firstVisibleSettingsEntry = useMemo(() => {
       const settingsItems = [
                 { id: "userAdmin", categoryId: "account", visible: !!canManageUsers },
+        { id: "menuAppearanceConfig", categoryId: "interface", visible: !!(canManageSettings || canViewSettings) },
         { id: "approvalDashboard", categoryId: "workflow", visible: !!(canViewApprovals || canManageApprovals) },
         { id: "approvalQueue", categoryId: "workflow", visible: !!(canViewApprovals || canManageApprovals) },
         { id: "notificationSettings", categoryId: "workflow", visible: !!(canManageNotifications || canManageSettings) },
@@ -3752,6 +3779,57 @@ const [cancellingTransactionId, setCancellingTransactionId] = useState("");
       isoDate: String((operatingDayCalendar || {})[monthKey] || "").trim(),
       thaiDate: formatThaiDateFromIsoDate((operatingDayCalendar || {})[monthKey]) || "-"
     })), [operatingDayCalendar, formatOperatingMonthLabel, formatThaiDateFromIsoDate]);
+    const normalizeMenuSettingsFrontend = useCallback((rawSettings) => {
+      const source = rawSettings && typeof rawSettings === "object" && !Array.isArray(rawSettings) ? rawSettings : {};
+      const allowedModes = new Set(["slide-left", "slide-right", "drop-down", "push-drawer", "overlay-menu", "fullscreen-menu", "fade-in-menu", "zoom-in-menu", "flip-3d-menu"]);
+      const allowedSides = new Set(["left", "right"]);
+      const normalizedModeCandidate = String(source.primaryMode || defaultMenuSettings.primaryMode).trim();
+      const normalizedMode = allowedModes.has(normalizedModeCandidate) ? normalizedModeCandidate : defaultMenuSettings.primaryMode;
+      let normalizedSide = String(source.drawerSide || (normalizedMode === "slide-right" ? "right" : defaultMenuSettings.drawerSide)).trim().toLowerCase();
+      if (normalizedMode === "slide-left") normalizedSide = "left";
+      if (normalizedMode === "slide-right") normalizedSide = "right";
+      if (!allowedSides.has(normalizedSide)) normalizedSide = defaultMenuSettings.drawerSide;
+      const readBool = (key) => Object.prototype.hasOwnProperty.call(source, key) ? !!source[key] : !!defaultMenuSettings[key];
+      return {
+        primaryMode: normalizedMode,
+        drawerSide: normalizedSide,
+        morphToX: readBool("morphToX"),
+        backdropBlur: readBool("backdropBlur"),
+        glassmorphism: readBool("glassmorphism"),
+        staggeredItems: readBool("staggeredItems"),
+        bounceToggle: readBool("bounceToggle"),
+        elasticDrawer: readBool("elasticDrawer"),
+        rippleClick: readBool("rippleClick"),
+        hoverUnderline: readBool("hoverUnderline"),
+        iconRotate: readBool("iconRotate")
+      };
+    }, []);
+    const effectiveMenuSettings = useMemo(() => normalizeMenuSettingsFrontend(menuSettings), [menuSettings, normalizeMenuSettingsFrontend]);
+    useEffect(() => {
+      if (typeof document === "undefined" || !document.body) return;
+      const body = document.body;
+      const root = document.documentElement;
+      body.dataset.menuMode = effectiveMenuSettings.primaryMode;
+      body.dataset.menuSide = effectiveMenuSettings.drawerSide;
+      const effectClassMap = {
+        morphToX: "ai-menu-effect-morph",
+        backdropBlur: "ai-menu-effect-backdrop",
+        glassmorphism: "ai-menu-effect-glass",
+        staggeredItems: "ai-menu-effect-stagger",
+        bounceToggle: "ai-menu-effect-bounce",
+        elasticDrawer: "ai-menu-effect-elastic",
+        rippleClick: "ai-menu-effect-ripple",
+        hoverUnderline: "ai-menu-effect-underline",
+        iconRotate: "ai-menu-effect-rotate"
+      };
+      Object.keys(effectClassMap).forEach((key) => {
+        body.classList.toggle(effectClassMap[key], !!effectiveMenuSettings[key]);
+      });
+      root.style.setProperty("--ai-menu-panel-width", effectiveMenuSettings.primaryMode === "fullscreen-menu" ? "100vw" : "min(380px, 92vw)");
+      try {
+        localStorage.setItem("menuSettings", JSON.stringify(effectiveMenuSettings));
+      } catch (e) {}
+    }, [effectiveMenuSettings]);
     const normalizeReportLayoutSettingsFrontend = useCallback((rawSettings) => {
       const defaults = {
         pageMarginsCm: { top: 0.3, right: 0.18, bottom: 0.3, left: 0.18 },
@@ -4197,6 +4275,7 @@ const [cancellingTransactionId, setCancellingTransactionId] = useState("");
             const safeOperatingDayCalendar = normalizeOperatingDayCalendarFrontend((data == null ? void 0 : data.settings) && data.settings.operatingDayCalendar);
             setOperatingDayCalendar(safeOperatingDayCalendar);
             setReportLayoutSettings(normalizeReportLayoutSettingsFrontend((data == null ? void 0 : data.settings) && data.settings.reportLayoutSettings));
+            setMenuSettings(normalizeMenuSettingsFrontend((data == null ? void 0 : data.settings) && data.settings.menuSettings));
             const nowDate = /* @__PURE__ */ new Date();
             const currentMonthKey = `${nowDate.getFullYear() + 543}-${String(nowDate.getMonth() + 1).padStart(2, "0")}`;
             setOperatingDayYearBe(String(nowDate.getFullYear() + 543));
@@ -4261,6 +4340,7 @@ const [cancellingTransactionId, setCancellingTransactionId] = useState("");
       setLastClosedAccountingMonthKey(String((safeData == null ? void 0 : safeData.settings) && safeData.settings.lastClosedAccountingMonth || ""));
       setOperatingDayCalendar(normalizeOperatingDayCalendarFrontend((safeData == null ? void 0 : safeData.settings) && safeData.settings.operatingDayCalendar));
       setReportLayoutSettings(normalizeReportLayoutSettingsFrontend((safeData == null ? void 0 : safeData.settings) && safeData.settings.reportLayoutSettings));
+      setMenuSettings(normalizeMenuSettingsFrontend((safeData == null ? void 0 : safeData.settings) && safeData.settings.menuSettings));
       setIsDataLoaded(true);
       refreshPendingBackgroundSaveState();
       return safeData;
@@ -7442,6 +7522,38 @@ const getQuickOverviewToneClass = (tone) => {
       }
       setReportLayoutStatus({ type: "error", message: "ไม่สามารถเชื่อมต่อบริการ Google Apps Script เพื่อบันทึกรูปแบบรายงานได้" });
     }, [canManageSettings, reportLayoutSettings, normalizeReportLayoutSettingsFrontend, parseBackendResponse, isActiveSettingsWorkspaceItem, canViewAuditLogs, auditLogLoaded, loadAuditLogRows]);
+
+    const handleSaveMenuSettings = useCallback(() => {
+      if (!canManageSettings) {
+        setMenuSettingsStatus({ type: "error", message: "บัญชีนี้ไม่มีสิทธิ์แก้ไขรูปแบบเมนู" });
+        return;
+      }
+      const normalizedPayload = normalizeMenuSettingsFrontend(menuSettings);
+      setMenuSettings(normalizedPayload);
+      setMenuSettingsStatus({ type: "loading", message: "กำลังบันทึกรูปแบบแฮมเบอร์เกอร์เมนู..." });
+      try {
+        localStorage.setItem("menuSettings", JSON.stringify(normalizedPayload));
+      } catch (e) {}
+      if (typeof google !== "undefined" && google.script && google.script.run) {
+        google.script.run.withSuccessHandler((response) => {
+          const result = parseBackendResponse(response);
+          if (!result || result.status === "Error") {
+            setMenuSettingsStatus({ type: "error", message: (result == null ? void 0 : result.message) || "บันทึกรูปแบบเมนูไม่สำเร็จ" });
+            return;
+          }
+          setMenuSettingsStatus({ type: "success", message: (result == null ? void 0 : result.message) || "บันทึกรูปแบบเมนูเรียบร้อยแล้ว" });
+          if (isActiveSettingsWorkspaceItem("auditLogs") && canViewAuditLogs && auditLogLoaded) {
+            loadAuditLogRows(true);
+          }
+          setTimeout(() => setMenuSettingsStatus({ type: "idle", message: "" }), 3000);
+        }).withFailureHandler((error) => {
+          setMenuSettingsStatus({ type: "error", message: "บันทึกรูปแบบเมนูไม่สำเร็จ: " + (((error == null ? void 0 : error.message) || error || "ไม่ทราบสาเหตุ")) });
+        }).saveSettings(JSON.stringify({ menuSettings: normalizedPayload }));
+        return;
+      }
+      setMenuSettingsStatus({ type: "success", message: "บันทึกรูปแบบเมนูในอุปกรณ์นี้เรียบร้อยแล้ว" });
+      setTimeout(() => setMenuSettingsStatus({ type: "idle", message: "" }), 3000);
+    }, [canManageSettings, menuSettings, normalizeMenuSettingsFrontend, parseBackendResponse, isActiveSettingsWorkspaceItem, canViewAuditLogs, auditLogLoaded, loadAuditLogRows]);
 
     const handleSetupDatabase = () => {
       if (!canManageSettings) {
@@ -14026,6 +14138,11 @@ const loadNotificationHistory = (forceReload = false) => {
       renderDriveAutoBackupHistoryPanel = () => null,
       renderNotificationHistoryPanel = () => null,
       renderAuditLogPanel = () => null,
+      menuSettings = {},
+      setMenuSettings = () => {},
+      normalizeMenuSettingsFrontend = (raw) => raw,
+      menuSettingsStatus = { type: "idle", message: "" },
+      handleSaveMenuSettings = () => {},
       operatingDayYearBe = "",
       setOperatingDayYearBe = () => {},
       operatingDayMonth = "",
@@ -14086,6 +14203,7 @@ const loadNotificationHistory = (forceReload = false) => {
 
     const categories = [
       { id: "account", label: "บัญชีและสิทธิ์", icon: Users, tone: "bg-emerald-50 text-emerald-700 border-emerald-100" },
+      { id: "interface", label: "หน้าจอและเมนู", icon: LayoutDashboard, tone: "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100" },
       { id: "workflow", label: "อนุมัติและการแจ้งเตือน", icon: Bell, tone: "bg-sky-50 text-sky-700 border-sky-100" },
       { id: "finance", label: "การเงินและกติกา", icon: TrendingUp, tone: "bg-blue-50 text-blue-700 border-blue-100" },
       { id: "database", label: "ฐานข้อมูลและงานระบบ", icon: Database, tone: "bg-violet-50 text-violet-700 border-violet-100" },
@@ -14192,6 +14310,128 @@ const loadNotificationHistory = (forceReload = false) => {
         ])
       ])
     );
+
+    const renderMenuAppearancePanel = () => {
+      const safeMenuSettings = normalizeMenuSettingsFrontend(menuSettings);
+      const primaryModeOptions = [
+        { value: "slide-left", label: "Slide In Left", hint: "เมนูเลื่อนเข้าจากด้านซ้าย" },
+        { value: "slide-right", label: "Slide In Right", hint: "เมนูเลื่อนเข้าจากด้านขวา" },
+        { value: "drop-down", label: "Drop Down Menu", hint: "เมนูเลื่อนลงมาจากด้านบน" },
+        { value: "push-drawer", label: "Push Drawer", hint: "เมนูดันเนื้อหาหน้าเว็บให้ขยับตาม" },
+        { value: "overlay-menu", label: "Overlay Menu", hint: "เมนูเปิดทับบนหน้าเว็บเดิม" },
+        { value: "fullscreen-menu", label: "Fullscreen Menu", hint: "เมนูขยายเต็มหน้าจอ" },
+        { value: "fade-in-menu", label: "Fade In Menu", hint: "เมนูค่อย ๆ ปรากฏด้วยเอฟเฟ็กต์จางเข้า" },
+        { value: "zoom-in-menu", label: "Zoom In Menu", hint: "เมนูย่อแล้วค่อยขยายขึ้นมาตอนแสดง" },
+        { value: "flip-3d-menu", label: "3D Flip Menu", hint: "เมนูพลิกเข้าเหมือนแผ่นการ์ด 3 มิติ" }
+      ];
+      const effectOptions = [
+        { key: "morphToX", label: "Morph to X", hint: "ปุ่ม 3 ขีดแปลงเป็นกากบาท X เมื่อเปิดเมนู" },
+        { key: "backdropBlur", label: "Backdrop Blur", hint: "พื้นหลังด้านหลังเมนูเบลอ" },
+        { key: "glassmorphism", label: "Glassmorphism Menu", hint: "เมนูโปร่งใสคล้ายกระจก" },
+        { key: "staggeredItems", label: "Staggered Menu Items", hint: "รายการเมนูแสดงทีละบรรทัดแบบต่อเนื่อง" },
+        { key: "bounceToggle", label: "Bounce Toggle", hint: "ปุ่มแฮมเบอร์เกอร์มีจังหวะเด้งเล็กน้อยตอนกด" },
+        { key: "elasticDrawer", label: "Elastic Drawer", hint: "เมนูเลื่อนเข้าแบบนุ่ม ๆ มีแรงยืดหยุ่น" },
+        { key: "rippleClick", label: "Ripple Click", hint: "ตอนกดปุ่มมีคลื่นวงกลมกระจายออก" },
+        { key: "hoverUnderline", label: "Hover Underline", hint: "เอาเมาส์ชี้แล้วมีเส้นใต้หรือแถบสีวิ่งใต้เมนู" },
+        { key: "iconRotate", label: "Icon Rotate", hint: "ไอคอนหมุนเล็กน้อยตอนเปิดหรือปิด" }
+      ];
+      const enabledEffects = effectOptions.filter((item) => safeMenuSettings[item.key]);
+      const applyMenuPatch = (patch) => {
+        setMenuSettings((prev) => ({
+          ...normalizeMenuSettingsFrontend(prev),
+          ...patch
+        }));
+      };
+      return h(
+        "div",
+        { className: "bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden p-8" },
+        h("div", { className: "flex items-start" }, [
+          h("div", { key: "icon", className: "bg-fuchsia-100 p-3 rounded-lg text-fuchsia-700 mr-4" }, h(LayoutDashboard, { className: "w-8 h-8" })),
+          h("div", { key: "body", className: "flex-1" }, [
+            h("h3", { key: "title", className: "text-xl font-bold text-slate-800" }, "ตั้งค่าแฮมเบอร์เกอร์เมนู"),
+            h("p", { key: "desc", className: "text-slate-500 mt-1" }, "ปรับเมนูนำทางให้เปิดแบบเต็มความสูงจากขอบบนถึงขอบล่าง พร้อมเลือกโหมดและเอฟเฟ็กต์ได้จากหน้านี้"),
+            h("div", { key: "preview", className: "mt-6 rounded-2xl border border-fuchsia-200 bg-gradient-to-r from-slate-900 via-slate-800 to-fuchsia-900 text-white p-5" }, [
+              h("p", { key: "eyebrow", className: "text-[11px] uppercase tracking-[0.18em] text-fuchsia-100/80 font-bold" }, "Menu Preview"),
+              h("h4", { key: "mode", className: "mt-2 text-2xl font-black" }, primaryModeOptions.find((item) => item.value === safeMenuSettings.primaryMode)?.label || "Slide In Left"),
+              h("p", { key: "modeDesc", className: "mt-1 text-sm text-fuchsia-50/80" }, primaryModeOptions.find((item) => item.value === safeMenuSettings.primaryMode)?.hint || "เมนูเลื่อนเข้าจากด้านซ้าย"),
+              h("div", { key: "chips", className: "mt-4 flex flex-wrap gap-2" }, enabledEffects.length > 0 ? enabledEffects.map((item) => h("span", { key: item.key, className: "rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-fuchsia-50" }, item.label)) : h("span", { className: "rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-fuchsia-50" }, "ไม่มีเอฟเฟ็กต์เสริม"))
+            ]),
+            h("div", { key: "modes", className: "mt-6" }, [
+              h("h4", { key: "title", className: "text-base font-bold text-slate-800" }, "รูปแบบหลักของเมนู"),
+              h("div", { key: "grid", className: "mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" }, primaryModeOptions.map((mode) => {
+                const active = safeMenuSettings.primaryMode === mode.value;
+                return h("button", {
+                  key: mode.value,
+                  type: "button",
+                  disabled: !canManageSettings,
+                  onClick: () => applyMenuPatch({
+                    primaryMode: mode.value,
+                    drawerSide: mode.value === "slide-right" ? "right" : mode.value === "slide-left" ? "left" : safeMenuSettings.drawerSide
+                  }),
+                  className: `rounded-xl border p-3 text-left transition-all ${active ? "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-900 shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"} ${!canManageSettings ? "opacity-70 cursor-not-allowed" : ""}`
+                }, [
+                  h("div", { key: "label", className: "font-bold text-sm" }, mode.label),
+                  h("p", { key: "hint", className: `mt-1 text-xs leading-5 ${active ? "text-fuchsia-700" : "text-slate-500"}` }, mode.hint)
+                ]);
+              }))
+            ]),
+            h("div", { key: "sideWrap", className: "mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4" }, [
+              h("div", { key: "row", className: "flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between" }, [
+                h("div", { key: "copy" }, [
+                  h("p", { key: "label", className: "font-bold text-slate-800" }, "ด้านที่เมนูเลื่อนเข้า"),
+                  h("p", { key: "hint", className: "mt-1 text-sm text-slate-500" }, "ใช้ได้กับโหมดที่ไม่ได้ล็อกซ้ายหรือขวาโดยอัตโนมัติ")
+                ]),
+                h("div", { key: "buttons", className: "flex rounded-xl border border-slate-200 bg-white p-1" }, [
+                  h("button", {
+                    key: "left",
+                    type: "button",
+                    disabled: !canManageSettings,
+                    onClick: () => applyMenuPatch({ drawerSide: "left" }),
+                    className: `px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${safeMenuSettings.drawerSide === "left" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`
+                  }, "ซ้าย"),
+                  h("button", {
+                    key: "right",
+                    type: "button",
+                    disabled: !canManageSettings,
+                    onClick: () => applyMenuPatch({ drawerSide: "right" }),
+                    className: `px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${safeMenuSettings.drawerSide === "right" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`
+                  }, "ขวา")
+                ])
+              ])
+            ]),
+            h("div", { key: "effects", className: "mt-6" }, [
+              h("h4", { key: "title", className: "text-base font-bold text-slate-800" }, "เอฟเฟ็กต์เสริม"),
+              h("div", { key: "grid", className: "mt-3 grid grid-cols-1 gap-3 md:grid-cols-2" }, effectOptions.map((effect) => {
+                const active = !!safeMenuSettings[effect.key];
+                return h("button", {
+                  key: effect.key,
+                  type: "button",
+                  disabled: !canManageSettings,
+                  onClick: () => applyMenuPatch({ [effect.key]: !active }),
+                  className: `rounded-xl border p-3 text-left transition-all ${active ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"} ${!canManageSettings ? "opacity-70 cursor-not-allowed" : ""}`
+                }, [
+                  h("div", { key: "row", className: "flex items-center justify-between gap-3" }, [
+                    h("p", { key: "label", className: "font-bold text-sm" }, effect.label),
+                    h("span", { key: "state", className: `rounded-full px-2.5 py-1 text-[10px] font-bold ${active ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500"}` }, active ? "เปิด" : "ปิด")
+                  ]),
+                  h("p", { key: "hint", className: `mt-1 text-xs leading-5 ${active ? "text-emerald-700" : "text-slate-500"}` }, effect.hint)
+                ]);
+              }))
+            ]),
+            h("div", { key: "footer", className: "mt-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between" }, [
+              h("p", { key: "hint", className: "text-sm text-slate-500" }, "ค่าที่เลือกจะถูกใช้กับเมนูนำทางทั้งระบบ และแสดงผลจริงทันทีในหน้าปัจจุบัน"),
+              canManageSettings ? h("button", { key: "save", type: "button", onClick: handleSaveMenuSettings, className: "bg-fuchsia-600 hover:bg-fuchsia-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-sm" }, "บันทึกรูปแบบเมนู") : null
+            ]),
+            renderStatusNotice(menuSettingsStatus, {
+              success: "bg-emerald-50 text-emerald-800 border-emerald-200",
+              error: "bg-red-50 text-red-800 border-red-200",
+              loading: "bg-fuchsia-50 text-fuchsia-800 border-fuchsia-200",
+              successTitle: "บันทึกรูปแบบเมนูสำเร็จ"
+            })
+          ])
+        ])
+      );
+    };
 
     const renderReportLayoutPanel = () => {
       const safeColumnWidths = safeEffectiveReportLayoutSettings.columnWidths || {};
@@ -14500,6 +14740,7 @@ const loadNotificationHistory = (forceReload = false) => {
 
     const items = [
       { id: "userAdmin", categoryId: "account", title: "จัดการผู้ใช้", summary: "เพิ่ม แก้ไข role สถานะ และสิทธิ์ผู้ใช้งานในระบบ", badge: "สำคัญ", favorite: true, recent: true, risk: true, visible: !!canManageUsers, render: renderUserAdminPanel },
+      { id: "menuAppearanceConfig", categoryId: "interface", title: "แฮมเบอร์เกอร์เมนู", summary: "เลือกรูปแบบการเปิดเมนูและเอฟเฟ็กต์นำทางแบบเต็มความสูง", badge: canManageSettings ? "ปรับแต่ง UI" : "ดูตัวอย่าง", favorite: true, recent: true, risk: false, visible: !!(canManageSettings || canViewSettings), render: renderMenuAppearancePanel },
       { id: "approvalDashboard", categoryId: "workflow", title: "ภาพรวมงานอนุมัติ", summary: "ดูภาพรวมคำขออนุมัติ รายการล่าสุด และสิ่งที่ต้องดำเนินการ", badge: "ใช้บ่อย", favorite: true, recent: true, risk: false, visible: !!(canViewApprovals || canManageApprovals), render: renderApprovalDashboardPanel },
       { id: "approvalQueue", categoryId: "workflow", title: "คิวงานอนุมัติ", summary: "อนุมัติ ปฏิเสธ หรือดูสถานะคำขอที่รอดำเนินการ", badge: "สำคัญ", favorite: true, recent: true, risk: true, visible: !!(canViewApprovals || canManageApprovals), render: renderApprovalQueuePanel },
       { id: "notificationSettings", categoryId: "workflow", title: "ตั้งค่าการแจ้งเตือน", summary: "กำหนดผู้รับและเหตุการณ์ที่ต้องส่งอีเมลแจ้งเตือน", badge: "แอดมิน", favorite: false, recent: true, risk: false, visible: !!(canManageNotifications || canManageSettings), render: renderNotificationSettingsPanel },
@@ -14643,11 +14884,12 @@ const loadNotificationHistory = (forceReload = false) => {
     return /* @__PURE__ */ React.createElement(
       "button",
       {
+        type: "button",
         onClick,
-        className: `ai-sidebar-item w-full flex items-center px-3 py-3 rounded-xl transition-all duration-200 whitespace-nowrap overflow-hidden ${active ? "ai-sidebar-item-active bg-emerald-600 text-white shadow-md" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`
+        className: `ai-sidebar-item ai-ripple-target relative w-full flex items-center px-3 py-3 rounded-xl transition-all duration-200 whitespace-nowrap overflow-hidden ${active ? "ai-sidebar-item-active bg-emerald-600 text-white shadow-md" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`
       },
-      /* @__PURE__ */ React.createElement("div", { className: `shrink-0 flex items-center justify-center w-6 h-6 ${active ? "text-white" : "text-slate-400"}` }, icon),
-      /* @__PURE__ */ React.createElement("span", { className: "font-medium text-sm ml-3 transition-opacity duration-200" }, label)
+      /* @__PURE__ */ React.createElement("div", { className: `ai-sidebar-icon-wrap shrink-0 flex items-center justify-center w-6 h-6 ${active ? "text-white" : "text-slate-400"}` }, icon),
+      /* @__PURE__ */ React.createElement("span", { className: "ai-sidebar-item-label font-medium text-sm ml-3 transition-opacity duration-200" }, label)
     );
   });
   const MonthlyCoverCard = React.memo(function MonthlyCoverCard2({ card }) {
@@ -14686,106 +14928,198 @@ const loadNotificationHistory = (forceReload = false) => {
 })();
     </script>
 
-<script id="ai-sidebar-toggle-v57">
-/* Floating hamburger menu: draggable, animated, auto 2-column fallback */
+<script id="ai-sidebar-toggle-v58">
+/* Full-height hamburger drawer with configurable animation modes */
 (function () {
   'use strict';
 
-  function updateColumns(sidebar) {
+  function syncBodyMenuState(sidebar) {
+    if (!document.body) return;
+    var isOpen = !!(sidebar && sidebar.classList.contains('ai-sidebar-open'));
+    document.body.classList.toggle('ai-menu-open', isOpen);
+    var mode = String(document.body.dataset.menuMode || 'slide-left').trim();
+    var side = String(document.body.dataset.menuSide || (mode === 'slide-right' ? 'right' : 'left')).trim().toLowerCase();
+    if (mode === 'slide-left') side = 'left';
+    if (mode === 'slide-right') side = 'right';
+    if (side !== 'right') side = 'left';
+    document.body.dataset.menuSide = side;
+  }
+
+  function addRipple(target, evt) {
+    if (!document.body || !document.body.classList.contains('ai-menu-effect-ripple') || !target || !target.getBoundingClientRect) return;
+    var rect = target.getBoundingClientRect();
+    var ripple = document.createElement('span');
+    ripple.className = 'ai-menu-ripple';
+    var size = Math.max(rect.width, rect.height, 44);
+    ripple.style.width = size + 'px';
+    ripple.style.height = size + 'px';
+    ripple.style.left = ((evt.clientX || rect.width / 2) - rect.left - size / 2) + 'px';
+    ripple.style.top = ((evt.clientY || rect.height / 2) - rect.top - size / 2) + 'px';
+    target.appendChild(ripple);
+    window.setTimeout(function () {
+      if (ripple && ripple.parentNode) ripple.parentNode.removeChild(ripple);
+    }, 480);
+  }
+
+  function refreshSidebarLayout(sidebar) {
+    if (!sidebar) return;
     var nav = sidebar.querySelector('nav');
     if (!nav) return;
-    sidebar.classList.remove('ai-sidebar-two-col');
-    var maxHeight = Math.max(220, Math.floor(window.innerHeight * 0.62));
-    if (nav.scrollHeight > maxHeight) {
-      sidebar.classList.add('ai-sidebar-two-col');
-    }
+    var items = nav.querySelectorAll('.ai-sidebar-item');
+    items.forEach(function (item, index) {
+      item.style.setProperty('--ai-stagger-index', String(index));
+    });
+    var useTwoCols = items.length > 8 && (document.body.dataset.menuMode === 'fullscreen-menu' || window.innerWidth > 1400);
+    sidebar.classList.toggle('ai-sidebar-two-col', !!useTwoCols);
+  }
+
+  function setMenuOpen(sidebar, nextOpen) {
+    if (!sidebar) return;
+    sidebar.classList.toggle('ai-sidebar-open', !!nextOpen);
+    syncBodyMenuState(sidebar);
+    refreshSidebarLayout(sidebar);
   }
 
   function init() {
     var sidebar = document.querySelector('.ai-sidebar');
-    if (!sidebar || sidebar._sbInit) return;
-    sidebar._sbInit = true;
-    sidebar.classList.add('ai-topbar-sidebar');
+    if (!sidebar || sidebar._fullHeightMenuInit) return;
+    sidebar._fullHeightMenuInit = true;
+    refreshSidebarLayout(sidebar);
+    syncBodyMenuState(sidebar);
 
-    updateColumns(sidebar);
-
-    /* Topbar hamburger toggle */
-    var hdr = sidebar.querySelector('div:first-child');
-    if (hdr) {
-      hdr.setAttribute('role', 'button');
-      hdr.setAttribute('tabindex', '0');
-
-      hdr.addEventListener('click', function (e) {
+    var toggle = sidebar.querySelector('div:first-child');
+    if (toggle) {
+      toggle.setAttribute('role', 'button');
+      toggle.setAttribute('tabindex', '0');
+      toggle.setAttribute('aria-label', 'เปิดหรือปิดเมนูนำทาง');
+      toggle.addEventListener('click', function (e) {
         e.stopPropagation();
-        sidebar.classList.toggle('ai-sidebar-open');
-        updateColumns(sidebar);
+        addRipple(toggle, e);
+        setMenuOpen(sidebar, !sidebar.classList.contains('ai-sidebar-open'));
       });
-
-      hdr.addEventListener('keydown', function (e) {
+      toggle.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          sidebar.classList.toggle('ai-sidebar-open');
-          updateColumns(sidebar);
+          setMenuOpen(sidebar, !sidebar.classList.contains('ai-sidebar-open'));
         }
       });
     }
 
-    /* Click on a nav item → collapse */
     var nav = sidebar.querySelector('nav');
     if (nav) {
-      var menuItems = nav.querySelectorAll('.ai-sidebar-item');
-      menuItems.forEach(function (item, index) {
-        item.style.setProperty('--ai-stagger-index', String(index));
-      });
-
-      nav.addEventListener('click', function () {
-        sidebar.classList.remove('ai-sidebar-open');
-      });
-    }
-
-    /* Click on logout area also collapses */
-    var logoutWrap = sidebar.querySelector('div:last-child');
-    if (logoutWrap) {
-      logoutWrap.addEventListener('click', function () {
-        sidebar.classList.remove('ai-sidebar-open');
+      nav.addEventListener('click', function (e) {
+        var target = e.target.closest('.ai-sidebar-item');
+        if (!target) return;
+        addRipple(target, e);
+        window.setTimeout(function () {
+          setMenuOpen(sidebar, false);
+        }, 60);
       });
     }
 
-    /* Click outside sidebar → collapse */
+    var logoutButton = sidebar.querySelector('.ai-sidebar-logout');
+    if (logoutButton) {
+      logoutButton.addEventListener('click', function (e) {
+        addRipple(logoutButton, e);
+        window.setTimeout(function () {
+          setMenuOpen(sidebar, false);
+        }, 60);
+      });
+    }
+
     document.addEventListener('click', function (e) {
       if (!sidebar.contains(e.target)) {
-        sidebar.classList.remove('ai-sidebar-open');
+        setMenuOpen(sidebar, false);
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        setMenuOpen(sidebar, false);
       }
     });
 
     window.addEventListener('resize', function () {
-      updateColumns(sidebar);
+      syncBodyMenuState(sidebar);
+      refreshSidebarLayout(sidebar);
     });
+
+    var observer = new MutationObserver(function () {
+      syncBodyMenuState(sidebar);
+      refreshSidebarLayout(sidebar);
+    });
+    observer.observe(document.body, { attributes: true, attributeFilter: ['data-menu-mode', 'data-menu-side'] });
   }
 
-  /* Wait for React to mount the sidebar */
-  var n = 0;
-  var t = setInterval(function () {
-    n++;
-    if (document.querySelector('.ai-sidebar')) { clearInterval(t); init(); }
-    else if (n >= 60) clearInterval(t);
+  var tries = 0;
+  var timer = setInterval(function () {
+    tries++;
+    if (document.querySelector('.ai-sidebar')) {
+      clearInterval(timer);
+      init();
+    } else if (tries >= 60) {
+      clearInterval(timer);
+    }
   }, 200);
 }());
 </script>
 
-<style id="ai-floating-sidebar-v1">
+<style id="ai-floating-sidebar-v2">
 @media screen {
+  :root {
+    --ai-menu-panel-width: min(380px, 92vw);
+    --ai-menu-toggle-size: 62px;
+    --ai-menu-bottom-height: 86px;
+    --ai-menu-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  body.ai-menu-effect-elastic {
+    --ai-menu-ease: cubic-bezier(0.16, 1.18, 0.3, 1);
+  }
+
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.34);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .32s ease, backdrop-filter .32s ease;
+    z-index: 110;
+  }
+
+  body.ai-menu-open {
+    overflow: hidden;
+  }
+
+  body.ai-menu-open::after {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  body.ai-menu-effect-backdrop.ai-menu-open::after {
+    background: rgba(15, 23, 42, 0.24);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
   .ai-sidebar {
     position: fixed !important;
-    left: 20px !important;
-    top: 0 !important;
-    width: auto !important;
-    height: auto !important;
+    inset: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
     background: transparent !important;
     box-shadow: none !important;
     overflow: visible !important;
-    z-index: 120 !important;
+    z-index: 140 !important;
     pointer-events: none;
+  }
+
+  .ai-main-shell,
+  .ai-topbar {
+    transition: transform 0.42s var(--ai-menu-ease);
   }
 
   .ai-main-shell {
@@ -14793,34 +15127,47 @@ const loadNotificationHistory = (forceReload = false) => {
   }
 
   .ai-topbar h2 {
-    padding-left: 84px !important;
+    padding-left: 88px !important;
     min-height: 64px;
     display: flex;
     align-items: center;
   }
 
+  body[data-menu-side="right"] .ai-topbar h2 {
+    padding-left: 0 !important;
+    padding-right: 88px !important;
+  }
+
   .ai-sidebar > div:first-child {
-    width: 64px;
-    height: 64px;
-    border-radius: 1rem;
-    background: linear-gradient(145deg, #0f172a, #1f2937) !important;
-    border: 1px solid rgba(148, 163, 184, 0.3) !important;
-    box-shadow: 0 16px 34px -18px rgba(15, 23, 42, 0.75);
+    position: fixed !important;
+    top: 16px !important;
+    left: 16px !important;
+    width: var(--ai-menu-toggle-size);
+    height: var(--ai-menu-toggle-size);
+    border-radius: 18px;
+    background: linear-gradient(145deg, #0f172a, #111827) !important;
+    border: 1px solid rgba(148, 163, 184, 0.26) !important;
+    box-shadow: 0 18px 38px -18px rgba(15, 23, 42, 0.72);
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 0 !important;
-    margin-top: 0;
     pointer-events: auto;
     cursor: pointer;
     user-select: none;
     -webkit-user-select: none;
-    transition: transform 0.22s ease, box-shadow 0.22s ease, border-radius 0.22s ease;
+    overflow: hidden;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
+  }
+
+  body[data-menu-side="right"] .ai-sidebar > div:first-child {
+    left: auto !important;
+    right: 16px !important;
   }
 
   .ai-sidebar > div:first-child:hover {
     transform: translateY(1px) scale(0.985);
-    box-shadow: 0 12px 28px -18px rgba(15, 23, 42, 0.75);
+    box-shadow: 0 12px 28px -18px rgba(15, 23, 42, 0.78);
   }
 
   .ai-sidebar > div:first-child > svg,
@@ -14828,119 +15175,264 @@ const loadNotificationHistory = (forceReload = false) => {
     display: none !important;
   }
 
-  .ai-sidebar > div:first-child::before {
+  .ai-sidebar > div:first-child::before,
+  .ai-sidebar > div:first-child::after {
     content: "";
+    position: absolute;
     width: 24px;
-    height: 3px;
+    height: 2.8px;
     border-radius: 9999px;
     background: #f8fafc;
-    box-shadow: 0 -8px 0 #f8fafc, 0 8px 0 #f8fafc;
-    transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: transform 0.34s var(--ai-menu-ease), opacity 0.24s ease, box-shadow 0.34s var(--ai-menu-ease);
   }
 
-  .ai-sidebar.ai-sidebar-open > div:first-child::before {
-    transform: rotate(90deg) scale(0.95);
-    box-shadow: 0 -8px 0 rgba(248, 250, 252, 0.9), 0 8px 0 rgba(248, 250, 252, 0.9);
+  .ai-sidebar > div:first-child::before {
+    box-shadow: 0 -8px 0 #f8fafc, 0 8px 0 #f8fafc;
+  }
+
+  .ai-sidebar > div:first-child::after {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+
+  body.ai-menu-open:not(.ai-menu-effect-morph) .ai-sidebar > div:first-child::before {
+    transform: rotate(90deg) scale(.94);
+  }
+
+  body.ai-menu-open.ai-menu-effect-morph .ai-sidebar > div:first-child::before {
+    box-shadow: none;
+    transform: rotate(45deg);
+  }
+
+  body.ai-menu-open.ai-menu-effect-morph .ai-sidebar > div:first-child::after {
+    opacity: 1;
+    transform: rotate(-45deg) scaleX(1);
+  }
+
+  body.ai-menu-effect-bounce.ai-menu-open .ai-sidebar > div:first-child {
+    animation: aiMenuToggleBounce .42s ease;
+  }
+
+  @keyframes aiMenuToggleBounce {
+    0% { transform: scale(1); }
+    40% { transform: scale(0.92); }
+    70% { transform: scale(1.05); }
+    100% { transform: scale(1); }
   }
 
   .ai-sidebar > nav,
   .ai-sidebar > div:last-child {
-    width: min(460px, calc(100vw - 32px));
-    margin-top: 10px;
-    border: 1px solid rgba(203, 213, 225, 0.55);
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.86) !important;
-    box-shadow: 0 34px 72px -36px rgba(15, 23, 42, 0.55);
-    backdrop-filter: blur(14px) saturate(1.05);
-    -webkit-backdrop-filter: blur(14px) saturate(1.05);
+    position: fixed !important;
+    left: 0 !important;
+    width: var(--ai-menu-panel-width);
+    background: #ffffff !important;
+    border-right: 1px solid rgba(203, 213, 225, 0.85);
+    box-shadow: 0 26px 60px -32px rgba(15, 23, 42, 0.45);
     pointer-events: auto;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(-10px) scale(0.98);
-    transform-origin: left top;
-    transition: opacity 0.36s cubic-bezier(0.22, 1, 0.36, 1), transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.36s;
+    transition: transform 0.42s var(--ai-menu-ease), opacity 0.28s ease, visibility 0.28s ease, background 0.28s ease;
+    z-index: 141;
   }
 
-  .ai-sidebar:not(.ai-sidebar-open) > nav,
-  .ai-sidebar:not(.ai-sidebar-open) > div:last-child {
-    display: none !important;
-    max-height: 0 !important;
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-    border-width: 0 !important;
-    overflow: hidden !important;
+  body.ai-menu-effect-glass .ai-sidebar > nav,
+  body.ai-menu-effect-glass .ai-sidebar > div:last-child {
+    background: rgba(255, 255, 255, 0.78) !important;
+    backdrop-filter: blur(14px) saturate(1.06);
+    -webkit-backdrop-filter: blur(14px) saturate(1.06);
   }
 
-  .ai-sidebar.ai-sidebar-open > nav,
-  .ai-sidebar.ai-sidebar-open > div:last-child {
-    display: block !important;
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-    transform: translateY(0) scale(1);
+  body[data-menu-side="right"] .ai-sidebar > nav,
+  body[data-menu-side="right"] .ai-sidebar > div:last-child {
+    left: auto !important;
+    right: 0 !important;
+    border-right: 0;
+    border-left: 1px solid rgba(203, 213, 225, 0.85);
   }
 
   .ai-sidebar > nav {
-    max-height: min(56vh, 520px);
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    padding: 14px !important;
+    top: 0 !important;
+    bottom: var(--ai-menu-bottom-height) !important;
+    padding: 94px 14px 16px !important;
     display: grid !important;
     grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-  }
-
-  .ai-sidebar.ai-sidebar-open > nav {
-    display: grid !important;
+    gap: 10px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    border-radius: 0 22px 22px 0;
   }
 
   .ai-sidebar.ai-sidebar-two-col > nav {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .ai-sidebar > div:last-child {
+    top: auto !important;
+    bottom: 0 !important;
+    height: var(--ai-menu-bottom-height) !important;
+    padding: 12px !important;
+    display: flex !important;
+    align-items: center;
+    border-radius: 0 0 22px 0;
+  }
+
+  body[data-menu-side="right"] .ai-sidebar > nav {
+    border-radius: 22px 0 0 22px;
+  }
+
+  body[data-menu-side="right"] .ai-sidebar > div:last-child {
+    border-radius: 0 0 0 22px;
+  }
+
+  .ai-sidebar > nav,
+  .ai-sidebar > div:last-child {
+    transform: translate3d(-104%, 0, 0);
+  }
+
+  body[data-menu-side="right"] .ai-sidebar > nav,
+  body[data-menu-side="right"] .ai-sidebar > div:last-child {
+    transform: translate3d(104%, 0, 0);
+  }
+
+  body[data-menu-mode="drop-down"] .ai-sidebar > nav,
+  body[data-menu-mode="drop-down"] .ai-sidebar > div:last-child,
+  body[data-menu-mode="fullscreen-menu"] .ai-sidebar > nav,
+  body[data-menu-mode="fullscreen-menu"] .ai-sidebar > div:last-child {
+    transform: translate3d(0, -104%, 0);
+  }
+
+  body[data-menu-mode="fade-in-menu"] .ai-sidebar > nav,
+  body[data-menu-mode="fade-in-menu"] .ai-sidebar > div:last-child {
+    transform: none;
+    opacity: 0;
+  }
+
+  body[data-menu-mode="zoom-in-menu"] .ai-sidebar > nav,
+  body[data-menu-mode="zoom-in-menu"] .ai-sidebar > div:last-child {
+    transform: translate3d(-4%, 0, 0) scale(0.92);
+  }
+
+  body[data-menu-side="right"][data-menu-mode="zoom-in-menu"] .ai-sidebar > nav,
+  body[data-menu-side="right"][data-menu-mode="zoom-in-menu"] .ai-sidebar > div:last-child {
+    transform: translate3d(4%, 0, 0) scale(0.92);
+  }
+
+  body[data-menu-mode="flip-3d-menu"] .ai-sidebar > nav,
+  body[data-menu-mode="flip-3d-menu"] .ai-sidebar > div:last-child {
+    transform: perspective(1400px) rotateY(18deg) translateX(-10%);
+    transform-origin: left center;
+  }
+
+  body[data-menu-side="right"][data-menu-mode="flip-3d-menu"] .ai-sidebar > nav,
+  body[data-menu-side="right"][data-menu-mode="flip-3d-menu"] .ai-sidebar > div:last-child {
+    transform: perspective(1400px) rotateY(-18deg) translateX(10%);
+    transform-origin: right center;
+  }
+
+  body[data-menu-mode="drop-down"] .ai-sidebar > nav,
+  body[data-menu-mode="drop-down"] .ai-sidebar > div:last-child,
+  body[data-menu-mode="fullscreen-menu"] .ai-sidebar > nav,
+  body[data-menu-mode="fullscreen-menu"] .ai-sidebar > div:last-child {
+    left: 0 !important;
+    right: 0 !important;
+    width: 100vw !important;
+    border-radius: 0 !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+  }
+
+  body.ai-menu-open .ai-sidebar > nav,
+  body.ai-menu-open .ai-sidebar > div:last-child {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+
+  body[data-menu-mode="push-drawer"].ai-menu-open .ai-main-shell,
+  body[data-menu-mode="push-drawer"].ai-menu-open .ai-topbar {
+    transform: translateX(clamp(250px, 22vw, 340px));
+  }
+
+  body[data-menu-side="right"][data-menu-mode="push-drawer"].ai-menu-open .ai-main-shell,
+  body[data-menu-side="right"][data-menu-mode="push-drawer"].ai-menu-open .ai-topbar {
+    transform: translateX(clamp(-340px, -22vw, -250px));
+  }
+
   .ai-sidebar-item {
     border: 1px solid #e2e8f0;
     background: #ffffff;
-    opacity: 0;
-    transform: translateY(-6px) scale(0.992);
-    transition: opacity 0.34s cubic-bezier(0.22, 1, 0.36, 1), transform 0.34s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-    transition-delay: 0ms;
+    color: inherit;
   }
 
-  .ai-sidebar.ai-sidebar-open .ai-sidebar-item {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    transition-delay: calc(var(--ai-stagger-index, 0) * 34ms + 40ms);
+  body.ai-menu-effect-glass .ai-sidebar-item {
+    background: rgba(255, 255, 255, 0.74);
   }
 
-  .ai-sidebar-item:active {
-    transform: scale(0.985);
+  .ai-sidebar-item .ai-sidebar-icon-wrap {
+    transition: transform .26s ease, color .26s ease;
   }
 
-  .ai-sidebar-item > span {
+  body.ai-menu-effect-rotate.ai-menu-open .ai-sidebar-item .ai-sidebar-icon-wrap {
+    transform: rotate(-8deg) scale(1.03);
+  }
+
+  .ai-sidebar-item .ai-sidebar-item-label {
     opacity: 1 !important;
-    margin-left: 10px;
+    position: relative;
     white-space: normal;
     line-height: 1.25;
   }
 
-  .ai-sidebar-item-active {
-    border-color: #10b981;
+  body.ai-menu-effect-underline .ai-sidebar-item .ai-sidebar-item-label::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -4px;
+    height: 2px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform .22s ease;
+    opacity: 0.75;
   }
 
-  .ai-sidebar > div:last-child {
-    margin-top: 10px;
-    padding: 10px !important;
-    border-top: 1px solid rgba(203, 213, 225, 0.5) !important;
-    background: rgba(255, 255, 255, 0.74) !important;
+  body.ai-menu-effect-underline .ai-sidebar-item:hover .ai-sidebar-item-label::after,
+  body.ai-menu-effect-underline .ai-sidebar-item-active .ai-sidebar-item-label::after {
+    transform: scaleX(1);
+  }
+
+  body.ai-menu-open.ai-menu-effect-stagger .ai-sidebar-item {
+    animation: aiMenuItemReveal .34s var(--ai-menu-ease) both;
+    animation-delay: calc(var(--ai-stagger-index, 0) * 34ms + 40ms);
+  }
+
+  @keyframes aiMenuItemReveal {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  body[data-menu-side="right"].ai-menu-open.ai-menu-effect-stagger .ai-sidebar-item {
+    animation-name: aiMenuItemRevealRight;
+  }
+
+  @keyframes aiMenuItemRevealRight {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .ai-sidebar-item:active,
+  .ai-sidebar-logout:active {
+    transform: scale(0.986);
   }
 
   .ai-sidebar-logout {
     justify-content: center;
     border: 1px solid #fecaca;
-    background: #fff1f2;
+    background: #fff1f2 !important;
     color: #be123c !important;
+    position: relative;
+    overflow: hidden;
   }
 
   .ai-sidebar-logout:hover {
@@ -14952,63 +15444,53 @@ const loadNotificationHistory = (forceReload = false) => {
     opacity: 1 !important;
   }
 
+  .ai-menu-ripple {
+    position: absolute;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.35);
+    transform: scale(0);
+    animation: aiMenuRipple 0.45s ease-out forwards;
+    pointer-events: none;
+  }
+
+  @keyframes aiMenuRipple {
+    to {
+      transform: scale(2.4);
+      opacity: 0;
+    }
+  }
+
   @media screen and (max-width: 768px) {
-    #root > div.min-h-screen.bg-slate-50.flex.font-sans.text-slate-800 > aside {
-      position: fixed !important;
-      left: 10px !important;
-      right: auto !important;
-      top: 0 !important;
-      bottom: auto !important;
-      width: auto !important;
-      height: auto !important;
-      border-top: 0 !important;
-      box-shadow: none !important;
-      overflow: visible !important;
+    :root {
+      --ai-menu-toggle-size: 56px;
+      --ai-menu-bottom-height: 80px;
     }
 
-    #root > div.min-h-screen.bg-slate-50.flex.font-sans.text-slate-800 > aside > div:first-child {
-      width: 58px !important;
-      height: 58px !important;
-      border-radius: 14px !important;
+    .ai-sidebar > div:first-child {
+      top: 12px !important;
+      left: 12px !important;
     }
 
-    #root > div.min-h-screen.bg-slate-50.flex.font-sans.text-slate-800 > main > header h2 {
+    body[data-menu-side="right"] .ai-sidebar > div:first-child {
+      right: 12px !important;
+    }
+
+    .ai-topbar h2 {
       padding-left: 70px !important;
     }
 
-    #root > div.min-h-screen.bg-slate-50.flex.font-sans.text-slate-800 > aside > div:first-child,
-    #root > div.min-h-screen.bg-slate-50.flex.font-sans.text-slate-800 > aside > div:last-child {
-      display: block !important;
+    body[data-menu-side="right"] .ai-topbar h2 {
+      padding-right: 70px !important;
     }
 
-    #root > div.min-h-screen.bg-slate-50.flex.font-sans.text-slate-800 > aside:not(.ai-sidebar-open) > nav,
-    #root > div.min-h-screen.bg-slate-50.flex.font-sans.text-slate-800 > aside:not(.ai-sidebar-open) > div:last-child {
-      display: none !important;
+    .ai-sidebar > nav {
+      width: min(88vw, 360px);
+      padding-top: 82px !important;
     }
 
-    #root > div.min-h-screen.bg-slate-50.flex.font-sans.text-slate-800 > aside nav {
-      display: grid !important;
-      white-space: normal !important;
-      overflow-x: hidden !important;
-      overflow-y: auto !important;
-      padding: 14px !important;
-      gap: 10px !important;
-    }
-
-    #root > div.min-h-screen.bg-slate-50.flex.font-sans.text-slate-800 > aside nav button {
-      min-width: 0 !important;
-      width: 100% !important;
-      flex-direction: row !important;
-      justify-content: flex-start !important;
-      gap: 0 !important;
-    }
-
-    #root > div.min-h-screen.bg-slate-50.flex.font-sans.text-slate-800 > aside nav button span {
-      margin-left: 10px !important;
-      text-align: left !important;
-      display: block !important;
-      -webkit-line-clamp: unset;
-      line-clamp: unset;
+    body[data-menu-mode="push-drawer"].ai-menu-open .ai-main-shell,
+    body[data-menu-mode="push-drawer"].ai-menu-open .ai-topbar {
+      transform: none;
     }
 
     #root > div.min-h-screen.bg-slate-50.flex.font-sans.text-slate-800 > main {
