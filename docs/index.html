@@ -2878,7 +2878,7 @@
     const [authView, setAuthView] = useState("login");
     const [authNotice, setAuthNotice] = useState({ type: "idle", message: "" });
     const [loginPin, setLoginPin] = useState("");
-    const loginPinInputRef = useRef(null);
+    const loginPinInputRefs = useRef([]);
     const [registerForm, setRegisterForm] = useState({ prefix: "", firstName: "", lastName: "", username: "", email: "", pin: "", confirmPin: "" });
     const [forgotForm, setForgotForm] = useState({ identifier: "", otp: "", newPin: "", confirmPin: "" });
     const [emailVerifyForm, setEmailVerifyForm] = useState({ identifier: "", otp: "" });
@@ -6367,6 +6367,58 @@ const getQuickOverviewToneClass = (tone) => {
       setAdminRecoveryForm((prev) => ({ ...prev, [field]: value }));
     };
     const isSixDigitPin = (value) => /^\d{6}$/.test(String(value || "").trim());
+    const focusLoginPinBox = (index) => {
+      const target = loginPinInputRefs.current[index];
+      if (target && typeof target.focus === "function") {
+        target.focus();
+        if (typeof target.select === "function") target.select();
+      }
+    };
+    const readLoginPinFromInputs = () => loginPinInputRefs.current.map((input) => String((input == null ? void 0 : input.value) || "").replace(/\D/g, "").slice(0, 1)).join("").slice(0, 6);
+    const clearLoginPinNoticeIfNeeded = () => {
+      if (authNotice.type !== "idle") setAuthNotice({ type: "idle", message: "" });
+    };
+    const handleLoginPinBoxChange = (index, rawValue) => {
+      const cleaned = String(rawValue || "").replace(/\D/g, "").slice(-1);
+      const input = loginPinInputRefs.current[index];
+      if (input && input.value !== cleaned) input.value = cleaned;
+      const nextValue = readLoginPinFromInputs();
+      setLoginPin(nextValue);
+      clearLoginPinNoticeIfNeeded();
+      if (cleaned && index < 5) {
+        window.setTimeout(() => focusLoginPinBox(index + 1), 0);
+      }
+    };
+    const handleLoginPinBoxKeyDown = (index, e) => {
+      if (e.key === "Backspace" && !(String((loginPinInputRefs.current[index] == null ? void 0 : loginPinInputRefs.current[index].value) || "").trim()) && index > 0) {
+        e.preventDefault();
+        const previousInput = loginPinInputRefs.current[index - 1];
+        if (previousInput) previousInput.value = "";
+        setLoginPin(readLoginPinFromInputs());
+        clearLoginPinNoticeIfNeeded();
+        window.setTimeout(() => focusLoginPinBox(index - 1), 0);
+        return;
+      }
+      if (e.key === "ArrowLeft" && index > 0) {
+        e.preventDefault();
+        focusLoginPinBox(index - 1);
+      }
+      if (e.key === "ArrowRight" && index < 5) {
+        e.preventDefault();
+        focusLoginPinBox(index + 1);
+      }
+    };
+    const handleLoginPinBoxPaste = (e) => {
+      const pasted = String((e.clipboardData && e.clipboardData.getData("text")) || "").replace(/\D/g, "").slice(0, 6);
+      if (!pasted) return;
+      e.preventDefault();
+      loginPinInputRefs.current.forEach((input, index) => {
+        if (input) input.value = pasted[index] || "";
+      });
+      setLoginPin(pasted);
+      clearLoginPinNoticeIfNeeded();
+      window.setTimeout(() => focusLoginPinBox(Math.min(pasted.length, 5)), 0);
+    };
     const handleSaveProfile = (e) => {
       e.preventDefault();
       if (isSavingProfile) return;
@@ -6414,12 +6466,11 @@ const getQuickOverviewToneClass = (tone) => {
         return;
       }
       const form = e.target;
-      const pinField = form && form.pin ? form.pin : null;
-      const pin = String(loginPin || (pinField ? pinField.value || "" : "")).replace(/\D/g, "").slice(0, 6);
-      if (pinField && pinField.value !== pin) pinField.value = pin;
+      const pin = String(readLoginPinFromInputs() || loginPin || "").replace(/\D/g, "").slice(0, 6);
       setLoginPin(pin);
       if (!isSixDigitPin(pin)) {
         setAuthNotice({ type: "error", message: "กรุณากรอก PIN 6 หลัก" });
+        focusLoginPinBox(0);
         return;
       }
       setIsLoading(true);
@@ -6460,7 +6511,7 @@ const getQuickOverviewToneClass = (tone) => {
             setAuthNotice({ type: "error", message: loginMessage });
             setLoginPin("");
             if (form && typeof form.reset === "function") form.reset();
-            if (pinField && typeof pinField.focus === "function") pinField.focus();
+            focusLoginPinBox(0);
             resetClientSession(loginMessage);
           }
           setIsLoading(false);
@@ -6469,7 +6520,7 @@ const getQuickOverviewToneClass = (tone) => {
           setAuthNotice({ type: "error", message: loginErrorMessage });
           setLoginPin("");
           if (form && typeof form.reset === "function") form.reset();
-          if (pinField && typeof pinField.focus === "function") pinField.focus();
+          focusLoginPinBox(0);
           resetClientSession(loginErrorMessage);
           setIsLoading(false);
         }).verifyLoginPin(pin);
@@ -11820,17 +11871,26 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
       const loginForm = /* @__PURE__ */ React.createElement("form", { onSubmit: handleLogin, className: "space-y-5" }, [
         /* @__PURE__ */ React.createElement("div", { key: "pass" }, [
           /* @__PURE__ */ React.createElement("label", { key: "label", className: "mb-2 block text-sm font-bold text-slate-700" }, "PIN 6 หลัก"),
-          /* @__PURE__ */ React.createElement("div", { key: "pin-ui", className: "relative", onClick: () => {
-            var _a;
-            (_a = loginPinInputRef.current) == null ? void 0 : _a.focus();
-          } }, [
-            /* @__PURE__ */ React.createElement("input", { key: "input", ref: loginPinInputRef, type: "password", name: "pin", value: loginPin, placeholder: "", autoComplete: "current-password", autoFocus: true, inputMode: "numeric", pattern: "[0-9]{6}", maxLength: 6, required: true, onChange: (e) => {
-              const cleaned = String(e.target.value || "").replace(/\D/g, "").slice(0, 6);
-              setLoginPin(cleaned);
-              if (authNotice.type !== "idle") setAuthNotice({ type: "idle", message: "" });
-            }, className: "absolute inset-0 z-10 h-full w-full cursor-text opacity-0" }),
-            /* @__PURE__ */ React.createElement("div", { key: "slots", className: "grid grid-cols-6 gap-2 sm:gap-3" }, loginPinSlots.map((digit, index) => /* @__PURE__ */ React.createElement("div", { key: `pin-slot-${index}`, className: `flex h-14 items-center justify-center rounded-2xl border-2 bg-white text-xl font-black shadow-sm transition-all ${digit ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-300"} ${loginPin.length === index ? "ring-4 ring-emerald-100" : ""}` }, digit ? "•" : "" )))
-          ]),
+          /* @__PURE__ */ React.createElement("div", { key: "slots", className: "grid grid-cols-6 gap-2 sm:gap-3" }, loginPinSlots.map((digit, index) => /* @__PURE__ */ React.createElement("input", {
+            key: `pin-slot-${index}`,
+            ref: (el) => {
+              loginPinInputRefs.current[index] = el;
+            },
+            type: "text",
+            inputMode: "numeric",
+            autoComplete: index === 0 ? "one-time-code" : "off",
+            pattern: "[0-9]*",
+            maxLength: 1,
+            value: digit,
+            onFocus: (e) => {
+              if (typeof e.target.select === "function") e.target.select();
+            },
+            onChange: (e) => handleLoginPinBoxChange(index, e.target.value),
+            onKeyDown: (e) => handleLoginPinBoxKeyDown(index, e),
+            onPaste: handleLoginPinBoxPaste,
+            className: `h-14 w-full rounded-2xl border-2 bg-white text-center text-xl font-black shadow-sm transition-all outline-none ${digit ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-500"} focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100`,
+            "aria-label": `PIN หลักที่ ${index + 1}`
+          }))),
           /* @__PURE__ */ React.createElement("p", { key: "auto-hint", className: "mt-2 text-center text-xs font-medium text-slate-500" }, "กรอก PIN ให้ครบ 6 หลัก แล้วกดปุ่มเข้าสู่ระบบ")
         ]),
         /* @__PURE__ */ React.createElement("button", { key: "submit", type: "submit", disabled: isLoading || !isOnline || loginPin.length !== 6, className: "inline-flex w-full items-center justify-center rounded-2xl bg-emerald-700 px-5 py-3.5 text-sm font-black text-white shadow-xl shadow-emerald-700/20 transition hover:-translate-y-0.5 hover:bg-emerald-800 disabled:opacity-60" }, [
