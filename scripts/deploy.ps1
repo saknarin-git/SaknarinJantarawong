@@ -48,39 +48,44 @@ function Invoke-Clasp {
     }
 
     $cmdLine = ('"{0}" {1}' -f $claspCmd, ($quotedArgs -join ' '))
-    $output = cmd /d /s /c $cmdLine 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $Global:ErrorActionPreference = "Continue"
+        $output = cmd /d /s /c $cmdLine 2>&1 | ForEach-Object { "$_" }
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $Global:ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    if ($exitCode -ne 0) {
         throw "clasp command failed: $($Args -join ' ')`n$($output | Out-String)"
     }
 
     return $output
 }
 
-$loginStatusOutput = Invoke-Clasp login --status
-$loginStatusText = ($loginStatusOutput | Out-String)
-$isLoggedIn = -not ($loginStatusText -match "(?i)not logged in")
-
-if (-not $isLoggedIn) {
-    Write-Host "[0/4] Not logged in. Opening clasp login flow..."
-    Invoke-Clasp login | Out-Null
-
-    $verifyStatusOutput = Invoke-Clasp login --status
-    $verifyStatusText = ($verifyStatusOutput | Out-String)
-    $isLoggedIn = -not ($verifyStatusText -match "(?i)not logged in")
-
-    if (-not $isLoggedIn) {
-        throw "clasp login is still not completed. Run clasp login manually and retry."
-    }
-}
-
-Write-Host "[0/4] Login status OK"
+Write-Host "[0/4] Preparing clasp session..."
 Write-Host "[0/4] Using stage directory: $StageDir"
 
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm"
 $versionDescription = "$Description $timestamp"
 
 Write-Host "[1/4] Pushing files..."
-Invoke-Clasp push -f | Out-Null
+try {
+    Invoke-Clasp push -f | Out-Null
+}
+catch {
+    $pushMessage = $_.Exception.Message
+    if ($pushMessage -match "(?i)login|auth|credential|unauthorized") {
+        Write-Host "[1/4] Clasp session not ready. Opening login flow..."
+        Invoke-Clasp login | Out-Null
+        Invoke-Clasp push -f | Out-Null
+    }
+    else {
+        throw
+    }
+}
 
 Write-Host "[2/4] Creating new version..."
 $versionOutput = Invoke-Clasp version $versionDescription

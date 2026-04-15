@@ -92,20 +92,31 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($remoteUrl)) {
     throw "Remote '$RemoteName' is not configured. Run: git remote add $RemoteName https://github.com/<user>/<repo>.git"
 }
 
-Write-Host "[4/6] Staging changes..."
+Write-Host "[4/7] Syncing GitHub Pages files..."
+$docsDir = Join-Path $projectRoot "docs"
+if (-not (Test-Path $docsDir)) {
+    New-Item -ItemType Directory -Path $docsDir | Out-Null
+}
+$sourceIndexFile = Join-Path $projectRoot "Index.html"
+$docsIndexFile = Join-Path $docsDir "index.html"
+if (Test-Path $sourceIndexFile) {
+    Copy-Item -Path $sourceIndexFile -Destination $docsIndexFile -Force
+}
+
+Write-Host "[5/7] Staging changes..."
 Invoke-Git @("add", "-A")
 
 $status = (& $git status --porcelain)
 if (-not [string]::IsNullOrWhiteSpace(($status | Out-String).Trim())) {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm"
     $commitMessage = "$Message $timestamp"
-    Write-Host "[5/6] Committing: $commitMessage"
+    Write-Host "[6/7] Committing: $commitMessage"
     Invoke-Git @("commit", "-m", $commitMessage)
 } else {
-    Write-Host "[5/6] No file changes to commit."
+    Write-Host "[6/7] No file changes to commit."
 }
 
-Write-Host "[6/6] Pushing to $RemoteName/$Branch..."
+Write-Host "[7/7] Pushing to $RemoteName/$Branch..."
 Invoke-Git @("push", "-u", $RemoteName, $Branch)
 
 Write-Host "Done. Pushed to GitHub successfully."

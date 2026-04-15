@@ -12,6 +12,7 @@ var REQUIRED_TRANSACTION_HEADERS_ = [
   'ผู้ทำรายการ', 'ชื่อ-สกุล', 'สถานะการทำรายการ',
   'จำนวนงวดดอกที่ชำระ', 'ค้างดอกก่อนรับชำระ', 'ค้างดอกหลังรับชำระ'
 ];
+var ACTIVE_API_REQUEST_CONTEXT_ = null;
 
 function getDatabaseSpreadsheet_() {
   if (EXECUTION_SPREADSHEET_INSTANCE_) return EXECUTION_SPREADSHEET_INSTANCE_;
@@ -26,6 +27,76 @@ function doGet() {
     .setTitle('ระบบจัดการเงินกู้ บ้านพิตำ')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+function parseApiRequestPayload_(e) {
+  var rawPayload = '';
+  try {
+    rawPayload = String((e && e.postData && e.postData.contents) || '').trim();
+  } catch (error) {
+    rawPayload = '';
+  }
+
+  if (!rawPayload && e && e.parameter && e.parameter.payload) {
+    rawPayload = String(e.parameter.payload || '').trim();
+  }
+
+  if (!rawPayload) return {};
+
+  try {
+    return JSON.parse(rawPayload);
+  } catch (error) {
+    return { raw: rawPayload };
+  }
+}
+
+function createJsonApiResponse_(payload) {
+  return ContentService
+    .createTextOutput(JSON.stringify(payload == null ? {} : payload))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function isAllowedApiMethodName_(methodName) {
+  var normalizedMethodName = String(methodName || '').trim();
+  if (!normalizedMethodName) return false;
+  if (!/^[A-Za-z0-9_]+$/.test(normalizedMethodName)) return false;
+  if (normalizedMethodName === 'doGet' || normalizedMethodName === 'doPost') return false;
+  if (normalizedMethodName.charAt(0) === '_' || normalizedMethodName.charAt(normalizedMethodName.length - 1) === '_') return false;
+  return typeof this[normalizedMethodName] === 'function';
+}
+
+function doPost(e) {
+  var previousRequestContext = ACTIVE_API_REQUEST_CONTEXT_;
+  try {
+    var payload = parseApiRequestPayload_(e);
+    var methodName = String(payload.method || payload.methodName || '').trim();
+    var args = Array.isArray(payload.args) ? payload.args : [];
+    var sessionToken = String(payload.sessionToken || '').trim();
+
+    if (!methodName) {
+      return createJsonApiResponse_({ status: 'Error', message: 'ไม่ได้ระบุชื่อเมธอดของ backend' });
+    }
+
+    if (!isAllowedApiMethodName_(methodName)) {
+      return createJsonApiResponse_({ status: 'Error', message: 'เมธอดนี้ไม่อนุญาตให้เรียกผ่าน API' });
+    }
+
+    ACTIVE_API_REQUEST_CONTEXT_ = {
+      sessionToken: sessionToken,
+      sessionData: getApiSessionFromToken_(sessionToken)
+    };
+
+    var backendFn = this[methodName];
+    var result = backendFn.apply(null, args);
+    return createJsonApiResponse_(result);
+  } catch (error) {
+    return createJsonApiResponse_({
+      status: 'Error',
+      message: error && error.message ? error.message : String(error || 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ')
+    });
+  } finally {
+    ACTIVE_API_REQUEST_CONTEXT_ = previousRequestContext;
+  }
 }
 
 var AUTH_SESSION_TTL_SECONDS = 21600;
@@ -223,10 +294,80 @@ function createAuthenticatedSession_(userInfo) {
     CacheService.getScriptCache().put(cacheKey, JSON.stringify(sessionData), AUTH_SESSION_TTL_SECONDS);
   }
 
+  if (ACTIVE_API_REQUEST_CONTEXT_) {
+    ACTIVE_API_REQUEST_CONTEXT_.sessionData = sessionData;
+  }
+
   return sessionData;
 }
 
+function getApiSessionFromRequestContext_() {
+  if (!ACTIVE_API_REQUEST_CONTEXT_ || !ACTIVE_API_REQUEST_CONTEXT_.sessionData) return null;
+  var sessionData = ACTIVE_API_REQUEST_CONTEXT_.sessionData;
+  return sessionData && sessionData.username ? sessionData : null;
+}
+
+function getApiSessionCacheKey_(sessionToken) {
+  var normalizedToken = String(sessionToken || '').trim();
+  return normalizedToken ? ('auth_api_session_' + normalizedToken) : '';
+}
+
+function createApiSessionToken_(sessionData) {
+  if (!sessionData || !sessionData.username) return '';
+  var sessionToken = Utilities.getUuid() + Utilities.getUuid().replace(/-/g, '');
+  touchApiSessionToken_(sessionToken, sessionData);
+  return sessionToken;
+}
+
+function getApiSessionFromToken_(sessionToken) {
+  var cacheKey = getApiSessionCacheKey_(sessionToken);
+  if (!cacheKey) return null;
+
+  try {
+    var rawCache = CacheService.getScriptCache().get(cacheKey);
+    if (!rawCache) return null;
+    var parsedCache = JSON.parse(rawCache);
+    if (parsedCache && parsedCache.username) return parsedCache;
+  } catch (e) {}
+
+  return null;
+}
+
+function touchApiSessionToken_(sessionToken, sessionData) {
+  var cacheKey = getApiSessionCacheKey_(sessionToken);
+  if (!cacheKey || !sessionData || !sessionData.username) return null;
+
+  var refreshedSession = {
+    userId: String(sessionData.userId || '').trim(),
+    username: String(sessionData.username || '').trim(),
+    fullName: String(sessionData.fullName || sessionData.username || '').trim(),
+    role: String(sessionData.role || 'staff').trim() || 'staff',
+    issuedAt: String(sessionData.issuedAt || new Date().toISOString()),
+    lastSeenAt: new Date().toISOString()
+  };
+
+  try {
+    CacheService.getScriptCache().put(cacheKey, JSON.stringify(refreshedSession), AUTH_SESSION_TTL_SECONDS);
+  } catch (e) {}
+
+  if (ACTIVE_API_REQUEST_CONTEXT_ && String(ACTIVE_API_REQUEST_CONTEXT_.sessionToken || '').trim() === String(sessionToken || '').trim()) {
+    ACTIVE_API_REQUEST_CONTEXT_.sessionData = refreshedSession;
+  }
+
+  return refreshedSession;
+}
+
+function clearApiSessionToken_(sessionToken) {
+  var cacheKey = getApiSessionCacheKey_(sessionToken);
+  if (!cacheKey) return;
+  try {
+    CacheService.getScriptCache().remove(cacheKey);
+  } catch (e) {}
+}
+
 function getAuthenticatedSession_() {
+  var apiSession = getApiSessionFromRequestContext_();
+  if (apiSession && apiSession.username) return apiSession;
   try {
     var rawUserCache = CacheService.getUserCache().get('auth_session_current');
     if (rawUserCache) {
@@ -260,6 +401,13 @@ function clearAuthenticatedSession_() {
       CacheService.getScriptCache().remove(cacheKey);
     }
   } catch (e) {}
+
+  try {
+    if (ACTIVE_API_REQUEST_CONTEXT_ && ACTIVE_API_REQUEST_CONTEXT_.sessionToken) {
+      clearApiSessionToken_(ACTIVE_API_REQUEST_CONTEXT_.sessionToken);
+      ACTIVE_API_REQUEST_CONTEXT_.sessionData = null;
+    }
+  } catch (e) {}
 }
 
 function touchAuthenticatedSession_(sessionData) {
@@ -282,6 +430,12 @@ function touchAuthenticatedSession_(sessionData) {
     var cacheKey = getAuthSessionCacheKey_();
     if (cacheKey) {
       CacheService.getScriptCache().put(cacheKey, JSON.stringify(refreshedSession), AUTH_SESSION_TTL_SECONDS);
+    }
+  } catch (e) {}
+
+  try {
+    if (ACTIVE_API_REQUEST_CONTEXT_ && ACTIVE_API_REQUEST_CONTEXT_.sessionToken) {
+      touchApiSessionToken_(ACTIVE_API_REQUEST_CONTEXT_.sessionToken, refreshedSession);
     }
   } catch (e) {}
 
@@ -361,7 +515,7 @@ function clearFailedLoginAttempts_(username) {
 
 function logoutCurrentSession() {
   clearAuthenticatedSession_();
-  return { status: 'Success' };
+  return { status: 'Success', clearSessionToken: true };
 }
 
 function getSessionSnapshot() {
@@ -5698,12 +5852,13 @@ function verifyLoginPin(username, pin) {
 
   clearFailedLoginAttempts_(userRecord.username || normalizedUsername);
   invalidateUserAuthorizationCache_(userRecord.username || normalizedUsername);
-  createAuthenticatedSession_({
+  var authenticatedSession = createAuthenticatedSession_({
     userId: userRecord.userId,
     username: userRecord.username,
     fullName: userRecord.fullName,
     role: userRecord.role
   });
+  var sessionToken = createApiSessionToken_(authenticatedSession);
   logSystemActionFast(ss, 'เข้าสู่ระบบ', 'ผู้ใช้งาน: ' + (userRecord.username || '-'));
   return {
     status: 'Success',
@@ -5711,7 +5866,9 @@ function verifyLoginPin(username, pin) {
     fullName: userRecord.fullName || userRecord.username,
     role: userRecord.role || 'staff',
     permissions: getEffectivePermissionsForUserRecord_(userRecord),
-    permissionCatalog: getPermissionCatalog_()
+    permissionCatalog: getPermissionCatalog_(),
+    sessionToken: sessionToken,
+    backendMode: 'gas-web-app'
   };
 }
 

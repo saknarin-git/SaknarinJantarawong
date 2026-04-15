@@ -69,8 +69,37 @@ git config user.name "your-name"
 git config user.email "your-email@example.com"
 ```
 
+## การใช้งานร่วมกันระหว่าง GitHub Pages และ GAS
+
+สถาปัตยกรรมใหม่เป็นแบบนี้:
+- หน้าเว็บ static รันจาก GitHub Pages
+- Backend และฐานข้อมูลยังอยู่ที่ Google Apps Script เดิม
+
+### ขั้นตอนเปิดใช้งาน GitHub Pages
+
+1. Deploy โปรเจกต์ GAS เป็น Web App ก่อน
+2. คัดลอก URL ที่ลงท้ายด้วย exec
+3. เปิด GitHub Pages ของโปรเจกต์ แล้วใส่ค่า URL ของ GAS Web App ครั้งแรก
+4. ระบบจะบันทึก URL นี้ไว้ในเบราว์เซอร์อัตโนมัติ
+
+### วิธีตั้งค่า URL ของ backend
+
+ทำได้ 2 แบบ:
+
+- เปิดหน้าด้วยพารามิเตอร์ gas_url
+- หรือกรอก URL ผ่านหน้าเว็บครั้งแรก ระบบจะจำค่าไว้ให้
+
+ตัวอย่าง:
+
+```text
+https://<user>.github.io/<repo>/docs/?gas_url=https://script.google.com/macros/s/DEPLOYMENT_ID/exec
+```
+
+> แนะนำให้ตั้งค่า GitHub Pages จากโฟลเดอร์ docs บน branch main
+
 ## ไฟล์ที่เกี่ยวข้องกับ Deploy
 
 - package.json
 - scripts/push-github.ps1
 - scripts/deploy.ps1
+- docs/index.html
