@@ -262,6 +262,7 @@ function getUserAuthorizationSnapshot_(username) {
     fullName: String(userRecord.fullName || buildFullNameFromParts_(userRecord.prefix, userRecord.firstName, userRecord.lastName) || userRecord.username || '').trim(),
     role: normalizeUserRole_(userRecord.role),
     status: normalizeUserStatus_(userRecord.status),
+    email: String(userRecord.email || '').trim(),
     emailVerifiedAt: String(userRecord.emailVerifiedAt || '').trim(),
     hasPin: !!String(userRecord.pinHash || '').trim(),
     updatedAt: String(userRecord.updatedAt || '').trim(),
@@ -4962,6 +4963,7 @@ function getAppData() {
       userId: String((currentUserSnapshot && currentUserSnapshot.userId) || sessionData.userId || '').trim(),
       username: String((currentUserSnapshot && currentUserSnapshot.username) || sessionData.username || '').trim(),
       fullName: String((currentUserSnapshot && currentUserSnapshot.fullName) || sessionData.fullName || '').trim(),
+      email: String((currentUserSnapshot && currentUserSnapshot.email) || '').trim(),
       role: String((currentUserSnapshot && currentUserSnapshot.role) || sessionData.role || 'staff').trim(),
       permissions: (currentUserSnapshot && currentUserSnapshot.permissions) || [],
       permissionCatalog: getPermissionCatalog_()
@@ -5868,6 +5870,7 @@ function verifyLoginPin(username, pin) {
     status: 'Success',
     username: userRecord.username,
     fullName: userRecord.fullName || userRecord.username,
+    email: String(userRecord.email || '').trim(),
     role: userRecord.role || 'staff',
     permissions: getEffectivePermissionsForUserRecord_(userRecord),
     permissionCatalog: getPermissionCatalog_(),
