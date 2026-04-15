@@ -14942,7 +14942,9 @@ const loadNotificationHistory = (forceReload = false) => {
     if (mode === 'slide-left') side = 'left';
     if (mode === 'slide-right') side = 'right';
     if (side !== 'right') side = 'left';
-    document.body.dataset.menuSide = side;
+    if (document.body.dataset.menuSide !== side) {
+      document.body.dataset.menuSide = side;
+    }
   }
 
   function addRipple(target, evt) {
@@ -15045,7 +15047,6 @@ const loadNotificationHistory = (forceReload = false) => {
     });
 
     var observer = new MutationObserver(function () {
-      syncBodyMenuState(sidebar);
       refreshSidebarLayout(sidebar);
     });
     observer.observe(document.body, { attributes: true, attributeFilter: ['data-menu-mode', 'data-menu-side'] });
@@ -15069,6 +15070,7 @@ const loadNotificationHistory = (forceReload = false) => {
   :root {
     --ai-menu-panel-width: min(380px, 92vw);
     --ai-menu-toggle-size: 62px;
+    --ai-menu-brand-width: 188px;
     --ai-menu-bottom-height: 86px;
     --ai-menu-ease: cubic-bezier(0.22, 1, 0.36, 1);
   }
@@ -15108,8 +15110,8 @@ const loadNotificationHistory = (forceReload = false) => {
   .ai-sidebar {
     position: fixed !important;
     inset: 0 !important;
-    width: 0 !important;
-    height: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
     background: transparent !important;
     box-shadow: none !important;
     overflow: visible !important;
@@ -15127,7 +15129,7 @@ const loadNotificationHistory = (forceReload = false) => {
   }
 
   .ai-topbar h2 {
-    padding-left: 88px !important;
+    padding-left: calc(var(--ai-menu-brand-width) + 18px) !important;
     min-height: 64px;
     display: flex;
     align-items: center;
@@ -15135,14 +15137,14 @@ const loadNotificationHistory = (forceReload = false) => {
 
   body[data-menu-side="right"] .ai-topbar h2 {
     padding-left: 0 !important;
-    padding-right: 88px !important;
+    padding-right: calc(var(--ai-menu-brand-width) + 18px) !important;
   }
 
   .ai-sidebar > div:first-child {
     position: fixed !important;
     top: 16px !important;
     left: 16px !important;
-    width: var(--ai-menu-toggle-size);
+    width: min(var(--ai-menu-brand-width), calc(100vw - 32px));
     height: var(--ai-menu-toggle-size);
     border-radius: 18px;
     background: linear-gradient(145deg, #0f172a, #111827) !important;
@@ -15150,8 +15152,8 @@ const loadNotificationHistory = (forceReload = false) => {
     box-shadow: 0 18px 38px -18px rgba(15, 23, 42, 0.72);
     display: flex;
     align-items: center;
-    justify-content: center;
-    padding: 0 !important;
+    justify-content: flex-start;
+    padding: 0 14px 0 54px !important;
     pointer-events: auto;
     cursor: pointer;
     user-select: none;
@@ -15170,17 +15172,41 @@ const loadNotificationHistory = (forceReload = false) => {
     box-shadow: 0 12px 28px -18px rgba(15, 23, 42, 0.78);
   }
 
-  .ai-sidebar > div:first-child > svg,
-  .ai-sidebar > div:first-child > div {
+  .ai-sidebar > div:first-child > svg {
     display: none !important;
+  }
+
+  .ai-sidebar > div:first-child > div {
+    display: block !important;
+    opacity: 1 !important;
+    margin-left: 0 !important;
+    min-width: 0;
+    pointer-events: none;
+  }
+
+  .ai-sidebar > div:first-child > div h1 {
+    font-size: 0.95rem !important;
+    line-height: 1.1 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ai-sidebar > div:first-child > div p {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .ai-sidebar > div:first-child::before,
   .ai-sidebar > div:first-child::after {
     content: "";
     position: absolute;
-    width: 24px;
+    left: 18px;
+    top: 50%;
+    width: 22px;
     height: 2.8px;
+    margin-top: -1px;
     border-radius: 9999px;
     background: #f8fafc;
     transition: transform 0.34s var(--ai-menu-ease), opacity 0.24s ease, box-shadow 0.34s var(--ai-menu-ease);
@@ -15463,12 +15489,16 @@ const loadNotificationHistory = (forceReload = false) => {
   @media screen and (max-width: 768px) {
     :root {
       --ai-menu-toggle-size: 56px;
+      --ai-menu-brand-width: 56px;
       --ai-menu-bottom-height: 80px;
     }
 
     .ai-sidebar > div:first-child {
       top: 12px !important;
       left: 12px !important;
+      width: var(--ai-menu-toggle-size) !important;
+      padding: 0 !important;
+      justify-content: center !important;
     }
 
     body[data-menu-side="right"] .ai-sidebar > div:first-child {
@@ -15476,11 +15506,15 @@ const loadNotificationHistory = (forceReload = false) => {
     }
 
     .ai-topbar h2 {
-      padding-left: 70px !important;
+      padding-left: 74px !important;
     }
 
     body[data-menu-side="right"] .ai-topbar h2 {
-      padding-right: 70px !important;
+      padding-right: 74px !important;
+    }
+
+    .ai-sidebar > div:first-child > div {
+      display: none !important;
     }
 
     .ai-sidebar > nav {
