@@ -12729,7 +12729,7 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
         } catch (e) {}
       }
       resetClientSession("");
-    }, className: "ai-sidebar-logout w-full flex items-center px-2 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" }, /* @__PURE__ */ React.createElement(LogOut, { className: "w-6 h-6 shrink-0" }), /* @__PURE__ */ React.createElement("span", { className: "ml-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100" }, "ออกจากระบบ")))), /* @__PURE__ */ React.createElement("main", { className: "ai-main-shell ml-[4.5rem] flex-1 flex flex-col min-h-screen relative w-full" }, /* @__PURE__ */ React.createElement("header", { className: "ai-topbar no-print bg-white h-16 shadow-sm flex items-center justify-between px-8 sticky top-0 z-0" }, /* @__PURE__ */ React.createElement("h2", { className: `transition-all ${activeTab === "payments" ? "text-2xl font-black tracking-tight text-blue-700" : "text-xl font-semibold text-slate-800"}` }, activeTab === "dashboard" && "ภาพรวมระบบ (Executive Dashboard)", activeTab === "payments" && "รับชำระเงิน (Payments)", activeTab === "payment_records" && "จัดการรายการรับชำระ", activeTab === "qualifications" && "ตรวจสอบคุณสมบัติผู้กู้และผู้ค้ำประกัน", activeTab === "members" && "ทะเบียนสมาชิกกลุ่มออมทรัพย์", activeTab === "loans" && "ระบบพิจารณาและจัดการสินเชื่อ", activeTab === "reports" && "รายงานและการวิเคราะห์", activeTab === "profile" && "ข้อมูลส่วนตัว", activeTab === "settings" && "การตั้งค่าและฐานข้อมูล")), /* @__PURE__ */ React.createElement("div", { className: `ai-content ${activeTab === "payments" ? "ai-content-payments p-3 overflow-hidden" : "p-8 overflow-auto"} flex-1 relative` }, activeTab === "qualifications" && renderQualificationsView(), activeTab === "payments" && renderPaymentsFocusView(), activeTab === "dashboard" && /* @__PURE__ */ React.createElement("div", { className: "ai-dashboard-page space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500" }, /* @__PURE__ */ React.createElement("div", { className: "ai-dashboard-overview-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" }, /* @__PURE__ */ React.createElement(StatCard, { title: "ยอดเงินกู้ทั้งหมด", value: formatCurrency(stats.totalLoanAmount), icon: /* @__PURE__ */ React.createElement(TrendingUp, null), color: "bg-blue-50 text-blue-700" }), /* @__PURE__ */ React.createElement(StatCard, { title: "ยอดสินเชื่อคงค้าง", value: formatCurrency(stats.activeLoans), icon: /* @__PURE__ */ React.createElement(CreditCard, null), color: "bg-emerald-50 text-emerald-700" }), /* @__PURE__ */ React.createElement(StatCard, { title: "จำนวนสมาชิกทั้งหมด", value: `${stats.totalMembers} คน`, icon: /* @__PURE__ */ React.createElement(Users, null), color: "bg-indigo-50 text-indigo-700" }), /* @__PURE__ */ React.createElement(StatCard, { title: "หนี้ไม่ก่อให้เกิดรายได้ (NPL)", value: `${stats.nplRatio}%`, icon: /* @__PURE__ */ React.createElement(AlertCircle, null), color: "bg-red-50 text-red-700" })), renderExecutiveDashboardPanel(), /* @__PURE__ */ React.createElement("div", { className: "ai-dashboard-approval-panel bg-white rounded-[1.75rem] shadow-sm border border-slate-200 overflow-hidden" }, /* @__PURE__ */ React.createElement("div", { className: "px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center" }, /* @__PURE__ */ React.createElement("h3", { className: "font-semibold text-slate-800 flex items-center" }, "รายการสินเชื่อรออนุมัติ / รอตรวจสอบ", /* @__PURE__ */ React.createElement("span", { className: "ml-2 bg-orange-100 text-orange-700 py-0.5 px-2 rounded-full text-xs font-bold" }, stats.pendingApprovalCount, " รายการ"))), /* @__PURE__ */ React.createElement("div", { className: "p-0 overflow-x-auto" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-left text-sm text-slate-600 min-w-[800px]" }, /* @__PURE__ */ React.createElement("thead", { className: "bg-white text-slate-500 border-b border-slate-200" }, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", { className: "px-6 py-3 font-medium" }, "รหัสสมาชิก"), /* @__PURE__ */ React.createElement("th", { className: "px-6 py-3 font-medium" }, "เลขที่สัญญา"), /* @__PURE__ */ React.createElement("th", { className: "px-6 py-3 font-medium" }, "ผู้กู้"), /* @__PURE__ */ React.createElement("th", { className: "px-6 py-3 font-medium" }, "ยอดขอกู้"), /* @__PURE__ */ React.createElement("th", { className: "px-6 py-3 font-medium text-right" }, "จัดการ"))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-slate-100" }, pendingApprovalLoans.map((loan, idx) => /* @__PURE__ */ React.createElement("tr", { key: idx, className: "hover:bg-slate-50 transition-colors" }, /* @__PURE__ */ React.createElement("td", { className: "px-6 py-4 font-medium text-slate-500" }, loan.memberId), /* @__PURE__ */ React.createElement("td", { className: "px-6 py-4 font-medium text-slate-800" }, loan.contract), /* @__PURE__ */ React.createElement("td", { className: "px-6 py-4" }, loan.member), /* @__PURE__ */ React.createElement("td", { className: "px-6 py-4 font-medium text-emerald-700" }, formatCurrency(loan.amount)), /* @__PURE__ */ React.createElement("td", { className: "px-6 py-4 text-right" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-end space-x-3" }, /* @__PURE__ */ React.createElement(
+    }, className: "ai-sidebar-logout w-full flex items-center px-2 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" }, /* @__PURE__ */ React.createElement(LogOut, { className: "w-6 h-6 shrink-0" }), /* @__PURE__ */ React.createElement("span", { className: "ml-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100" }, "ออกจากระบบ")))), /* @__PURE__ */ React.createElement("main", { className: "ai-main-shell ml-[4.5rem] flex-1 flex flex-col min-h-screen relative w-full" }, /* @__PURE__ */ React.createElement("header", { className: "ai-topbar no-print bg-white h-16 shadow-sm flex items-center justify-between px-8 sticky top-0 z-0" }, /* @__PURE__ */ React.createElement("h2", { className: `transition-all ${activeTab === "payments" ? "text-2xl font-black tracking-tight text-blue-700" : "text-xl font-semibold text-slate-800"}` }, activeTab === "dashboard" && "ภาพรวมระบบ (Executive Dashboard)", activeTab === "payments" && "รับชำระเงิน (Payments)", activeTab === "payment_records" && "จัดการรายการรับชำระ", activeTab === "qualifications" && "ตรวจสอบคุณสมบัติผู้กู้และผู้ค้ำประกัน", activeTab === "members" && "ทะเบียนสมาชิกกลุ่มออมทรัพย์", activeTab === "loans" && "ระบบพิจารณาและจัดการสินเชื่อ", activeTab === "reports" && "รายงานและการวิเคราะห์", activeTab === "profile" && "ข้อมูลส่วนตัว", activeTab === "settings" && "การตั้งค่าและฐานข้อมูล")), /* @__PURE__ */ React.createElement("div", { className: `ai-content ${activeTab === "payments" ? "ai-content-payments p-3 overflow-hidden" : "p-8 overflow-auto"} flex-1 relative` }, activeTab === "qualifications" && renderQualificationsView(), activeTab === "payments" && renderPaymentsFocusView(), activeTab === "dashboard" && /* @__PURE__ */ React.createElement("div", { className: "ai-dashboard-page space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500" }, /* @__PURE__ */ React.createElement("div", { className: "ai-dashboard-overview-grid grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4 gap-5" }, /* @__PURE__ */ React.createElement(StatCard, { title: "ยอดเงินกู้ทั้งหมด", value: formatCurrency(stats.totalLoanAmount), icon: /* @__PURE__ */ React.createElement(TrendingUp, null), color: "bg-blue-50 text-blue-700" }), /* @__PURE__ */ React.createElement(StatCard, { title: "ยอดสินเชื่อคงค้าง", value: formatCurrency(stats.activeLoans), icon: /* @__PURE__ */ React.createElement(CreditCard, null), color: "bg-emerald-50 text-emerald-700" }), /* @__PURE__ */ React.createElement(StatCard, { title: "จำนวนสมาชิกทั้งหมด", value: `${stats.totalMembers} คน`, icon: /* @__PURE__ */ React.createElement(Users, null), color: "bg-indigo-50 text-indigo-700" }), /* @__PURE__ */ React.createElement(StatCard, { title: "หนี้ไม่ก่อให้เกิดรายได้ (NPL)", value: `${stats.nplRatio}%`, icon: /* @__PURE__ */ React.createElement(AlertCircle, null), color: "bg-red-50 text-red-700" })), renderExecutiveDashboardPanel(), /* @__PURE__ */ React.createElement("div", { className: "ai-dashboard-approval-panel bg-white rounded-[1.75rem] shadow-sm border border-slate-200 overflow-hidden" }, /* @__PURE__ */ React.createElement("div", { className: "px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center" }, /* @__PURE__ */ React.createElement("h3", { className: "font-semibold text-slate-800 flex items-center" }, "รายการสินเชื่อรออนุมัติ / รอตรวจสอบ", /* @__PURE__ */ React.createElement("span", { className: "ml-2 bg-orange-100 text-orange-700 py-0.5 px-2 rounded-full text-xs font-bold" }, stats.pendingApprovalCount, " รายการ"))), /* @__PURE__ */ React.createElement("div", { className: "p-0 overflow-x-auto" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-left text-sm text-slate-600 min-w-[800px]" }, /* @__PURE__ */ React.createElement("thead", { className: "bg-white text-slate-500 border-b border-slate-200" }, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", { className: "px-6 py-3 font-medium" }, "รหัสสมาชิก"), /* @__PURE__ */ React.createElement("th", { className: "px-6 py-3 font-medium" }, "เลขที่สัญญา"), /* @__PURE__ */ React.createElement("th", { className: "px-6 py-3 font-medium" }, "ผู้กู้"), /* @__PURE__ */ React.createElement("th", { className: "px-6 py-3 font-medium" }, "ยอดขอกู้"), /* @__PURE__ */ React.createElement("th", { className: "px-6 py-3 font-medium text-right" }, "จัดการ"))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-slate-100" }, pendingApprovalLoans.map((loan, idx) => /* @__PURE__ */ React.createElement("tr", { key: idx, className: "hover:bg-slate-50 transition-colors" }, /* @__PURE__ */ React.createElement("td", { className: "px-6 py-4 font-medium text-slate-500" }, loan.memberId), /* @__PURE__ */ React.createElement("td", { className: "px-6 py-4 font-medium text-slate-800" }, loan.contract), /* @__PURE__ */ React.createElement("td", { className: "px-6 py-4" }, loan.member), /* @__PURE__ */ React.createElement("td", { className: "px-6 py-4 font-medium text-emerald-700" }, formatCurrency(loan.amount)), /* @__PURE__ */ React.createElement("td", { className: "px-6 py-4 text-right" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-end space-x-3" }, /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => handleApproveLoan(loan.contract),
@@ -14081,7 +14081,7 @@ const loadNotificationHistory = (forceReload = false) => {
         /* @__PURE__ */ React.createElement("button", { key: "refresh", type: "button", onClick: () => loadExecutiveDashboard(true), className: "rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-5 py-2.5 font-semibold flex items-center transition-colors shadow-sm" }, executiveDashboardLoading ? /* @__PURE__ */ React.createElement(RefreshCw, { className: "w-4 h-4 mr-2 animate-spin" }) : /* @__PURE__ */ React.createElement(RefreshCw, { className: "w-4 h-4 mr-2" }), "รีเฟรชแดชบอร์ด")
       ]),
       executiveDashboardNotice.message ? /* @__PURE__ */ React.createElement("div", { key: "notice", className: `ai-dashboard-notice mt-5 rounded-xl border px-4 py-3 text-sm ${executiveDashboardNotice.type === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-cyan-200 bg-cyan-50 text-cyan-700"}` }, executiveDashboardNotice.message) : null,
-      /* @__PURE__ */ React.createElement("div", { key: "cards", className: "ai-dashboard-executive-cards mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" }, cards.map((card) => /* @__PURE__ */ React.createElement("div", { key: card.label, className: `ai-dashboard-executive-card rounded-2xl border p-4 ${card.className}` }, [/* @__PURE__ */ React.createElement("p", { key: "label", className: "text-xs font-bold uppercase tracking-wide opacity-80" }, card.label), /* @__PURE__ */ React.createElement("p", { key: "value", className: "mt-2 text-2xl font-black" }, card.value)]))),
+      /* @__PURE__ */ React.createElement("div", { key: "cards", className: "ai-dashboard-executive-cards mt-6 grid grid-cols-1 md:grid-cols-2 gap-5" }, cards.map((card) => /* @__PURE__ */ React.createElement("div", { key: card.label, className: `ai-dashboard-executive-card rounded-[1.35rem] border p-5 min-h-[118px] ${card.className}` }, [/* @__PURE__ */ React.createElement("p", { key: "label", className: "text-xs font-bold uppercase tracking-wide opacity-80" }, card.label), /* @__PURE__ */ React.createElement("p", { key: "value", className: "mt-2 text-3xl font-black leading-tight" }, card.value)]))),
       /* @__PURE__ */ React.createElement("div", { key: "tables", className: "mt-6 grid grid-cols-1 xl:grid-cols-2 gap-6" }, [
         /* @__PURE__ */ React.createElement("div", { key: "months", className: "ai-dashboard-executive-table-card rounded-[1.5rem] border border-slate-200 overflow-hidden" }, [
           /* @__PURE__ */ React.createElement("div", { key: "title", className: "px-5 py-4 border-b border-slate-200 bg-slate-50" }, /* @__PURE__ */ React.createElement("h4", { className: "text-lg font-black text-slate-900" }, "สรุปยอดส่งบัญชี 6 เดือนล่าสุด")),
@@ -14886,17 +14886,17 @@ const loadNotificationHistory = (forceReload = false) => {
       {
         type: "button",
         onClick,
-        className: `ai-sidebar-item ai-ripple-target relative w-full flex items-center px-3 py-3 rounded-xl transition-all duration-200 whitespace-nowrap overflow-hidden ${active ? "ai-sidebar-item-active bg-emerald-600 text-white shadow-md" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`
+        className: `ai-sidebar-item ai-ripple-target relative w-full flex items-center gap-3 px-4 py-4 rounded-2xl transition-all duration-200 whitespace-nowrap overflow-hidden ${active ? "ai-sidebar-item-active bg-emerald-600 text-white shadow-md" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`
       },
-      /* @__PURE__ */ React.createElement("div", { className: `ai-sidebar-icon-wrap shrink-0 flex items-center justify-center w-6 h-6 ${active ? "text-white" : "text-slate-400"}` }, icon),
-      /* @__PURE__ */ React.createElement("span", { className: "ai-sidebar-item-label font-medium text-sm ml-3 transition-opacity duration-200" }, label)
+      /* @__PURE__ */ React.createElement("div", { className: `ai-sidebar-icon-wrap shrink-0 flex items-center justify-center w-10 h-10 rounded-xl ${active ? "bg-white/15 text-white" : "bg-slate-50 text-slate-500"}` }, icon),
+      /* @__PURE__ */ React.createElement("span", { className: "ai-sidebar-item-label font-semibold text-[15px] leading-5 ml-0 transition-opacity duration-200" }, label)
     );
   });
   const MonthlyCoverCard = React.memo(function MonthlyCoverCard2({ card }) {
     return /* @__PURE__ */ React.createElement("article", { className: "ai-month-card group relative overflow-hidden rounded-[26px] border border-slate-200 bg-white/90 p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl" }, /* @__PURE__ */ React.createElement("div", { className: "absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500" }), /* @__PURE__ */ React.createElement("div", { className: "flex items-start justify-between gap-4" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: "text-xs font-bold uppercase tracking-[0.18em] text-slate-400" }, "เดือน ", card.month), /* @__PURE__ */ React.createElement("h4", { className: "mt-1 text-xl font-black text-slate-800" }, card.monthLabel), /* @__PURE__ */ React.createElement("p", { className: "mt-1 text-xs font-medium text-slate-500" }, "ข้อมูลใบปะหน้า ", card.yearBe)), /* @__PURE__ */ React.createElement("div", { className: "ai-month-card-icon rounded-2xl bg-emerald-50 p-3 text-emerald-700 ring-1 ring-emerald-100" }, /* @__PURE__ */ React.createElement(CalendarDays, { className: "w-5 h-5" }))), /* @__PURE__ */ React.createElement("div", { className: "ai-month-card-hero mt-5 rounded-3xl bg-slate-950 px-4 py-4 text-white shadow-lg shadow-slate-950/10" }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-100/70" }, "ยอดส่งบัญชี"), /* @__PURE__ */ React.createElement("div", { className: "mt-2 flex items-end justify-between gap-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black tracking-tight" }, formatCurrency(card.totalSent)), /* @__PURE__ */ React.createElement("span", { className: "rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold text-cyan-50/90" }, card.transactionCount.toLocaleString(), " รายการ")), /* @__PURE__ */ React.createElement("div", { className: "ai-progress-track mt-4 h-2 overflow-hidden rounded-full bg-white/10" }, /* @__PURE__ */ React.createElement("div", { className: "ai-progress-fill h-full rounded-full bg-gradient-to-r from-emerald-300 via-cyan-300 to-blue-300", style: { width: `${card.progressPercent}%` } }))), /* @__PURE__ */ React.createElement("div", { className: "mt-5 grid grid-cols-2 gap-3 text-sm" }, /* @__PURE__ */ React.createElement("div", { className: "rounded-2xl border border-amber-100 bg-amber-50 px-3 py-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] font-bold uppercase tracking-[0.16em] text-amber-500" }, "หนี้ยกมา"), /* @__PURE__ */ React.createElement("p", { className: "mt-1 text-base font-black text-amber-700" }, formatCurrency(card.broughtForwardDebt))), /* @__PURE__ */ React.createElement("div", { className: "rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-500" }, "หนี้ยกไป"), /* @__PURE__ */ React.createElement("p", { className: "mt-1 text-base font-black text-emerald-700" }, formatCurrency(card.carriedForwardDebt))), /* @__PURE__ */ React.createElement("div", { className: "rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400" }, "ชำระเงินต้น"), /* @__PURE__ */ React.createElement("p", { className: "mt-1 text-base font-black text-slate-800" }, formatCurrency(card.principalPaid))), /* @__PURE__ */ React.createElement("div", { className: "rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400" }, "ชำระดอกเบี้ย"), /* @__PURE__ */ React.createElement("p", { className: "mt-1 text-base font-black text-slate-800" }, formatCurrency(card.interestPaid))), /* @__PURE__ */ React.createElement("div", { className: "rounded-2xl border border-rose-100 bg-rose-50 px-3 py-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] font-bold uppercase tracking-[0.16em] text-rose-400" }, "ยอดกลบหนี้"), /* @__PURE__ */ React.createElement("p", { className: "mt-1 text-base font-black text-rose-700" }, formatCurrency(card.offsetPaid))), /* @__PURE__ */ React.createElement("div", { className: "rounded-2xl border border-slate-200 bg-white px-3 py-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400" }, "สมาชิก/สัญญา"), /* @__PURE__ */ React.createElement("p", { className: "mt-1 text-base font-black text-slate-800" }, card.memberCount.toLocaleString(), " / ", card.contractCount.toLocaleString()))));
   });
   const StatCard = React.memo(function StatCard2({ title, value, icon, color }) {
-    return /* @__PURE__ */ React.createElement("div", { className: "ai-dashboard-stat-card bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-start space-x-4 hover:shadow-md transition-shadow" }, /* @__PURE__ */ React.createElement("div", { className: `p-4 rounded-lg ${color}` }, icon), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: "text-sm font-medium text-slate-500 mb-1" }, title), /* @__PURE__ */ React.createElement("h4", { className: "text-2xl font-bold text-slate-800" }, value)));
+    return /* @__PURE__ */ React.createElement("div", { className: "ai-dashboard-stat-card bg-white p-6 md:p-7 rounded-[1.35rem] shadow-sm border border-slate-200 flex items-start space-x-4 hover:shadow-md transition-shadow min-h-[132px]" }, /* @__PURE__ */ React.createElement("div", { className: `p-4 rounded-xl ${color}` }, icon), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: "text-sm font-medium text-slate-500 mb-1" }, title), /* @__PURE__ */ React.createElement("h4", { className: "text-3xl font-bold text-slate-800 leading-tight" }, value)));
   });
   const root = ReactDOM.createRoot(document.getElementById("root"));
   root.render(
@@ -14971,7 +14971,7 @@ const loadNotificationHistory = (forceReload = false) => {
     items.forEach(function (item, index) {
       item.style.setProperty('--ai-stagger-index', String(index));
     });
-    var useTwoCols = items.length > 8 && (document.body.dataset.menuMode === 'fullscreen-menu' || window.innerWidth > 1400);
+    var useTwoCols = items.length > 6 && (document.body.dataset.menuMode === 'fullscreen-menu' || window.innerWidth > 960);
     sidebar.classList.toggle('ai-sidebar-two-col', !!useTwoCols);
   }
 
@@ -15041,6 +15041,20 @@ const loadNotificationHistory = (forceReload = false) => {
       }
     });
 
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        setMenuOpen(sidebar, false);
+      }
+    });
+
+    window.addEventListener('blur', function () {
+      setMenuOpen(sidebar, false);
+    });
+
+    window.addEventListener('pagehide', function () {
+      setMenuOpen(sidebar, false);
+    });
+
     window.addEventListener('resize', function () {
       syncBodyMenuState(sidebar);
       refreshSidebarLayout(sidebar);
@@ -15068,9 +15082,9 @@ const loadNotificationHistory = (forceReload = false) => {
 <style id="ai-floating-sidebar-v2">
 @media screen {
   :root {
-    --ai-menu-panel-width: min(380px, 92vw);
-    --ai-menu-toggle-size: 62px;
-    --ai-menu-brand-width: 172px;
+    --ai-menu-panel-width: min(420px, 94vw);
+    --ai-menu-toggle-size: 48px;
+    --ai-menu-brand-width: 56px;
     --ai-menu-bottom-height: 86px;
     --ai-menu-ease: cubic-bezier(0.22, 1, 0.36, 1);
   }
@@ -15098,7 +15112,7 @@ const loadNotificationHistory = (forceReload = false) => {
   body.ai-menu-open::after {
     opacity: 1;
     visibility: visible;
-    pointer-events: auto;
+    pointer-events: none;
   }
 
   body.ai-menu-effect-backdrop.ai-menu-open::after {
@@ -15132,7 +15146,7 @@ const loadNotificationHistory = (forceReload = false) => {
   }
 
   .ai-topbar h2 {
-    padding-left: calc(var(--ai-menu-brand-width) + 22px) !important;
+    padding-left: calc(var(--ai-menu-toggle-size) + 18px) !important;
     min-height: 64px;
     display: flex;
     align-items: center;
@@ -15140,77 +15154,57 @@ const loadNotificationHistory = (forceReload = false) => {
 
   body[data-menu-side="right"] .ai-topbar h2 {
     padding-left: 0 !important;
-    padding-right: calc(var(--ai-menu-brand-width) + 18px) !important;
+    padding-right: calc(var(--ai-menu-toggle-size) + 18px) !important;
   }
 
   .ai-sidebar > div:first-child {
     position: fixed !important;
-    top: 16px !important;
-    left: 16px !important;
-    width: min(var(--ai-menu-brand-width), calc(100vw - 32px));
+    top: 8px !important;
+    left: 12px !important;
+    width: var(--ai-menu-toggle-size) !important;
     height: var(--ai-menu-toggle-size);
-    border-radius: 18px;
-    background: linear-gradient(145deg, #0f172a, #111827) !important;
-    border: 1px solid rgba(148, 163, 184, 0.26) !important;
-    box-shadow: 0 18px 38px -18px rgba(15, 23, 42, 0.72);
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--theme-primary, #2563eb) 0%, var(--theme-primary-2, #0ea5e9) 100%) !important;
+    border: 1px solid color-mix(in srgb, var(--theme-primary, #2563eb) 68%, white) !important;
+    box-shadow: 0 14px 30px color-mix(in srgb, var(--theme-primary, #2563eb) 22%, transparent);
     display: flex;
     align-items: center;
-    justify-content: flex-start;
-    padding: 0 12px 0 50px !important;
+    justify-content: center !important;
+    padding: 0 !important;
     pointer-events: auto;
     cursor: pointer;
     user-select: none;
     -webkit-user-select: none;
     overflow: hidden;
-    transition: transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease;
   }
 
   body[data-menu-side="right"] .ai-sidebar > div:first-child {
     left: auto !important;
-    right: 16px !important;
+    right: 12px !important;
   }
 
   .ai-sidebar > div:first-child:hover {
     transform: translateY(1px) scale(0.985);
-    box-shadow: 0 12px 28px -18px rgba(15, 23, 42, 0.78);
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--theme-primary, #2563eb) 20%, transparent);
+    filter: saturate(1.04);
   }
 
-  .ai-sidebar > div:first-child > svg {
-    display: none !important;
-  }
-
+  .ai-sidebar > div:first-child > svg,
   .ai-sidebar > div:first-child > div {
-    display: block !important;
-    opacity: 1 !important;
-    margin-left: 0 !important;
-    min-width: 0;
-    max-width: calc(var(--ai-menu-brand-width) - 62px);
-    pointer-events: none;
-  }
-
-  .ai-sidebar > div:first-child > div h1 {
-    font-size: 0.95rem !important;
-    line-height: 1.1 !important;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .ai-sidebar > div:first-child > div p {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: none !important;
   }
 
   .ai-sidebar > div:first-child::before,
   .ai-sidebar > div:first-child::after {
     content: "";
     position: absolute;
-    left: 18px;
+    left: 50%;
     top: 50%;
     width: 22px;
     height: 2.8px;
     margin-top: -1px;
+    margin-left: -11px;
     border-radius: 9999px;
     background: #f8fafc;
     transition: transform 0.34s var(--ai-menu-ease), opacity 0.24s ease, box-shadow 0.34s var(--ai-menu-ease);
@@ -15401,6 +15395,10 @@ const loadNotificationHistory = (forceReload = false) => {
     border: 1px solid #e2e8f0;
     background: #ffffff;
     color: inherit;
+    min-height: 72px;
+    padding: 0.9rem 1rem !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
   }
 
   body.ai-menu-effect-glass .ai-sidebar-item {
@@ -15501,29 +15499,29 @@ const loadNotificationHistory = (forceReload = false) => {
 
   @media screen and (max-width: 768px) {
     :root {
-      --ai-menu-toggle-size: 56px;
-      --ai-menu-brand-width: 56px;
+      --ai-menu-toggle-size: 46px;
+      --ai-menu-brand-width: 46px;
       --ai-menu-bottom-height: 80px;
     }
 
     .ai-sidebar > div:first-child {
-      top: 12px !important;
-      left: 12px !important;
+      top: 9px !important;
+      left: 10px !important;
       width: var(--ai-menu-toggle-size) !important;
       padding: 0 !important;
       justify-content: center !important;
     }
 
     body[data-menu-side="right"] .ai-sidebar > div:first-child {
-      right: 12px !important;
+      right: 10px !important;
     }
 
     .ai-topbar h2 {
-      padding-left: 74px !important;
+      padding-left: 64px !important;
     }
 
     body[data-menu-side="right"] .ai-topbar h2 {
-      padding-right: 74px !important;
+      padding-right: 64px !important;
     }
 
     .ai-sidebar > div:first-child > div {
