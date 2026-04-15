@@ -777,6 +777,27 @@ function findUserByPinUniqueKeyInternal_(usersSheet, pinUniqueKey) {
   return null;
 }
 
+function findUserByLoginPinInternal_(usersSheet, pinValue) {
+  var normalizedPin = normalizePinInput_(pinValue);
+  if (!isValidSixDigitPin_(normalizedPin)) return null;
+
+  var directMatch = findUserByPinUniqueKeyInternal_(usersSheet, computePinUniqueKey_(normalizedPin));
+  if (directMatch) return directMatch;
+
+  var users = getAllUserRecords_(usersSheet);
+  var matchedUser = null;
+  for (var i = 0; i < users.length; i++) {
+    var user = users[i];
+    if (!String((user && user.pinHash) || '').trim()) continue;
+    if (!verifyPasswordAgainstStoredHash_(normalizedPin, user.pinHash)) continue;
+    if (matchedUser && String(matchedUser.userId || '').trim() !== String(user.userId || '').trim()) {
+      throw new Error('PIN นี้ซ้ำกับหลายบัญชี กรุณาติดต่อผู้ดูแลระบบ');
+    }
+    matchedUser = user;
+  }
+  return matchedUser;
+}
+
 function ensurePinUniqueAcrossUsers_(usersSheet, pinValue, excludeUserId) {
   var pinUniqueKey = computePinUniqueKey_(pinValue);
   if (!pinUniqueKey) throw new Error('PIN ไม่ถูกต้อง');
@@ -5799,29 +5820,42 @@ function verifyLoginPin(username, pin) {
   var ss = getDatabaseSpreadsheet_();
   var usersSheet = ensureUsersSheet_(ss);
   var normalizedUsername = normalizeUsername_(username);
+  var normalizedPin = normalizePinInput_(pin);
 
-  if (!normalizedUsername) {
-    return { status: 'Error', message: 'กรุณากรอกชื่อผู้ใช้' };
+  if (!normalizedPin && isValidSixDigitPin_(username)) {
+    normalizedPin = normalizePinInput_(username);
+    normalizedUsername = '';
   }
 
-  var normalizedPin = normalizePinInput_(pin);
   if (!isValidSixDigitPin_(normalizedPin)) {
     return { status: 'Error', message: 'กรุณากรอก PIN 6 หลัก' };
   }
 
-  var lockoutState = getLoginLockoutState_(normalizedUsername);
+  var lockIdentity = normalizedUsername || ('pin:' + computePinUniqueKey_(normalizedPin));
+  var lockoutState = getLoginLockoutState_(lockIdentity);
   if (lockoutState.locked) {
     return { status: 'Locked', message: 'พยายามเข้าสู่ระบบผิดเกินกำหนด กรุณารอ 15 นาทีแล้วลองใหม่อีกครั้ง' };
   }
 
-  var userRecord = findUserByUsernameInternal_(usersSheet, normalizedUsername);
+  var userRecord = null;
+  try {
+    userRecord = normalizedUsername
+      ? findUserByUsernameInternal_(usersSheet, normalizedUsername)
+      : findUserByLoginPinInternal_(usersSheet, normalizedPin);
+  } catch (lookupError) {
+    return {
+      status: 'Error',
+      message: lookupError && lookupError.message ? lookupError.message : 'ไม่สามารถตรวจสอบ PIN ได้'
+    };
+  }
+
   if (!userRecord || !userRecord.pinHash) {
-    var failedStateNotFound = registerFailedLoginAttempt_(normalizedUsername);
+    var failedStateNotFound = registerFailedLoginAttempt_(lockIdentity);
     return {
       status: failedStateNotFound.locked ? 'Locked' : 'Error',
       message: failedStateNotFound.locked
         ? 'พยายามเข้าสู่ระบบผิดเกินกำหนด กรุณารอ 15 นาทีแล้วลองใหม่อีกครั้ง'
-        : 'ชื่อผู้ใช้ หรือ PIN ไม่ถูกต้อง'
+        : (normalizedUsername ? 'ชื่อผู้ใช้ หรือ PIN ไม่ถูกต้อง' : 'PIN ไม่ถูกต้อง')
     };
   }
 
@@ -5841,12 +5875,12 @@ function verifyLoginPin(username, pin) {
 
   var pinMatched = verifyPasswordAgainstStoredHash_(normalizedPin, userRecord.pinHash);
   if (!pinMatched) {
-    var failedState = registerFailedLoginAttempt_(userRecord.username || normalizedUsername);
+    var failedState = registerFailedLoginAttempt_(userRecord.username || lockIdentity);
     return {
       status: failedState.locked ? 'Locked' : 'Error',
       message: failedState.locked
         ? 'พยายามเข้าสู่ระบบผิดเกินกำหนด กรุณารอ 15 นาทีแล้วลองใหม่อีกครั้ง'
-        : 'ชื่อผู้ใช้ หรือ PIN ไม่ถูกต้อง'
+        : (normalizedUsername ? 'ชื่อผู้ใช้ หรือ PIN ไม่ถูกต้อง' : 'PIN ไม่ถูกต้อง')
     };
   }
 
@@ -5856,8 +5890,9 @@ function verifyLoginPin(username, pin) {
     updatedAt: loginAt
   });
 
-  clearFailedLoginAttempts_(userRecord.username || normalizedUsername);
-  invalidateUserAuthorizationCache_(userRecord.username || normalizedUsername);
+  clearFailedLoginAttempts_(lockIdentity);
+  clearFailedLoginAttempts_(userRecord.username || normalizedUsername || lockIdentity);
+  invalidateUserAuthorizationCache_(userRecord.username || normalizedUsername || lockIdentity);
   var authenticatedSession = createAuthenticatedSession_({
     userId: userRecord.userId,
     username: userRecord.username,

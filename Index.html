@@ -6405,14 +6405,23 @@ const getQuickOverviewToneClass = (tone) => {
     };
     const handleLogin = (e) => {
       e.preventDefault();
+      if (isLoading) return;
       if (!isOnline) {
         setAuthNotice({ type: "error", message: "อุปกรณ์ออฟไลน์ กรุณาเชื่อมต่ออินเทอร์เน็ตก่อนเข้าสู่ระบบ" });
         return;
       }
+      const form = e.target;
+      const usernameField = form && form.username ? form.username : null;
+      const pinField = form && form.pin ? form.pin : null;
+      const username = usernameField ? String(usernameField.value || "").trim() : "";
+      const pin = String(pinField ? pinField.value || "" : "").replace(/\D/g, "").slice(0, 6);
+      if (pinField && pinField.value !== pin) pinField.value = pin;
+      if (!isSixDigitPin(pin)) {
+        setAuthNotice({ type: "error", message: "กรุณากรอก PIN 6 หลัก" });
+        return;
+      }
       setIsLoading(true);
-      setAuthNotice({ type: "idle", message: "" });
-      const username = e.target.username.value;
-      const pin = e.target.pin.value;
+      setAuthNotice({ type: "loading", message: "กำลังตรวจสอบ PIN..." });
       if (typeof google !== "undefined" && google.script && google.script.run) {
         google.script.run.withSuccessHandler((response) => {
           const result = typeof response === "string" ? { status: response } : response || {};
@@ -6444,14 +6453,18 @@ const getQuickOverviewToneClass = (tone) => {
             setAuthNotice({ type: "idle", message: "" });
             setIsAuthenticated(true);
           } else {
-            const loginMessage = (result == null ? void 0 : result.message) || "ชื่อผู้ใช้ หรือ PIN ไม่ถูกต้อง";
+            const loginMessage = (result == null ? void 0 : result.message) || "PIN ไม่ถูกต้อง";
             setAuthNotice({ type: "error", message: loginMessage });
+            if (form && typeof form.reset === "function") form.reset();
+            if (pinField && typeof pinField.focus === "function") pinField.focus();
             resetClientSession(loginMessage);
           }
           setIsLoading(false);
         }).withFailureHandler((error) => {
           const loginErrorMessage = "เข้าสู่ระบบไม่สำเร็จ: " + (((error == null ? void 0 : error.message) || error || "ไม่ทราบสาเหตุ"));
           setAuthNotice({ type: "error", message: loginErrorMessage });
+          if (form && typeof form.reset === "function") form.reset();
+          if (pinField && typeof pinField.focus === "function") pinField.focus();
           resetClientSession(loginErrorMessage);
           setIsLoading(false);
         }).verifyLoginPin(username, pin);
@@ -11799,21 +11812,26 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
       const authNoticeBox = authNotice.type !== "idle" && /* @__PURE__ */ React.createElement("div", { className: `ai-auth-notice ai-auth-notice-${authNotice.type} rounded-2xl px-4 py-3 text-sm font-medium ${noticeClass}` }, authNotice.message);
       const offlineAuthBox = !isOnline && /* @__PURE__ */ React.createElement("div", { className: "ai-offline-notice rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800" }, "อุปกรณ์ออฟไลน์อยู่ ขณะนี้สามารถกรอกข้อมูลได้ แต่การเข้าสู่ระบบหรือขอ OTP จะทำงานเมื่อเชื่อมต่ออินเทอร์เน็ตแล้วเท่านั้น");
       const loginForm = /* @__PURE__ */ React.createElement("form", { onSubmit: handleLogin, className: "space-y-5" }, [
-        /* @__PURE__ */ React.createElement("div", { key: "user" }, [
-          /* @__PURE__ */ React.createElement("label", { key: "label", className: "mb-2 block text-sm font-bold text-slate-700" }, "ชื่อผู้ใช้"),
-          /* @__PURE__ */ React.createElement("input", { key: "input", type: "text", name: "username", placeholder: "กรอกชื่อผู้ใช้", autoComplete: "username", autoCapitalize: "none", autoCorrect: "off", spellCheck: false, required: true, className: "w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-medium text-slate-700 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100" })
-        ]),
         /* @__PURE__ */ React.createElement("div", { key: "pass" }, [
           /* @__PURE__ */ React.createElement("label", { key: "label", className: "mb-2 block text-sm font-bold text-slate-700" }, "PIN 6 หลัก"),
-          /* @__PURE__ */ React.createElement("input", { key: "input", type: "password", name: "pin", placeholder: "กรอก PIN 6 หลัก", autoComplete: "current-password", inputMode: "numeric", pattern: "[0-9]{6}", maxLength: 6, required: true, className: "w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-medium text-slate-700 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100" })
+          /* @__PURE__ */ React.createElement("input", { key: "input", type: "password", name: "pin", placeholder: "กรอก PIN 6 หลัก", autoComplete: "current-password", autoFocus: true, inputMode: "numeric", pattern: "[0-9]{6}", maxLength: 6, required: true, onChange: (e) => {
+            const cleaned = String(e.target.value || "").replace(/\D/g, "").slice(0, 6);
+            if (cleaned !== e.target.value) e.target.value = cleaned;
+            if (authNotice.type !== "idle") setAuthNotice({ type: "idle", message: "" });
+            if (cleaned.length === 6 && !isLoading && isOnline) {
+              if (e.target.form && typeof e.target.form.requestSubmit === "function") e.target.form.requestSubmit();
+              else if (e.target.form) e.target.form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+            }
+          }, className: "w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-center text-2xl font-black tracking-[0.45em] text-slate-700 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100" }),
+          /* @__PURE__ */ React.createElement("p", { key: "auto-hint", className: "mt-2 text-center text-xs font-medium text-slate-500" }, "กรอกครบ 6 หลัก ระบบจะตรวจรหัสให้อัตโนมัติ")
         ]),
         /* @__PURE__ */ React.createElement("button", { key: "submit", type: "submit", disabled: isLoading || !isOnline, className: "inline-flex w-full items-center justify-center rounded-2xl bg-emerald-700 px-5 py-3.5 text-sm font-black text-white shadow-xl shadow-emerald-700/20 transition hover:-translate-y-0.5 hover:bg-emerald-800 disabled:opacity-60" }, [
           isLoading ? /* @__PURE__ */ React.createElement(Loader2, { key: "spin", className: "mr-2 h-5 w-5 animate-spin" }) : /* @__PURE__ */ React.createElement(ArrowRight, { key: "icon", className: "mr-2 h-5 w-5" }),
-          "เข้าสู่ระบบ"
+          isLoading ? "กำลังตรวจสอบ..." : "เข้าสู่ระบบ"
         ]),
         /* @__PURE__ */ React.createElement("div", { key: "hint", className: "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-500" }, [
           /* @__PURE__ */ React.createElement("p", { key: "title", className: "font-bold text-slate-700" }, "หมายเหตุสำหรับการใช้งานครั้งแรก"),
-          /* @__PURE__ */ React.createElement("p", { key: "desc" }, "ระบบจะสร้างบัญชีผู้ดูแลระบบเริ่มต้นชื่อผู้ใช้ ", /* @__PURE__ */ React.createElement("span", { className: "font-bold text-slate-700" }, "admin"), " และ PIN ", /* @__PURE__ */ React.createElement("span", { className: "font-bold text-slate-700" }, "123456"), " เมื่อรัน setupDatabase ครั้งแรก")
+          /* @__PURE__ */ React.createElement("p", { key: "desc" }, "ระบบจะสร้างบัญชีผู้ดูแลระบบเริ่มต้นพร้อม PIN ", /* @__PURE__ */ React.createElement("span", { className: "font-bold text-slate-700" }, "123456"), " เมื่อรัน setupDatabase ครั้งแรก")
         ]),
         /* @__PURE__ */ React.createElement("button", { key: "recover", type: "button", onClick: () => switchAuthView("adminRecovery"), className: "w-full rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-bold text-rose-700 transition hover:bg-rose-100" }, "กู้บัญชีแอดมินฉุกเฉิน")
       ]);
@@ -11970,7 +11988,7 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
           /* @__PURE__ */ React.createElement("div", { key: "body", className: "auth-ai-form-panel mt-6 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6" }, [
             /* @__PURE__ */ React.createElement("div", { key: "titleWrap", className: "mb-5" }, [
               /* @__PURE__ */ React.createElement("h3", { key: "title", className: "text-xl font-black tracking-tight text-slate-900" }, authView === "login" ? "เข้าสู่ระบบ" : authView === "register" ? "สมัครใช้งาน" : authView === "verifyEmail" ? "ยืนยันอีเมล" : authView === "adminRecovery" ? "กู้บัญชีแอดมิน" : "ลืม PIN"),
-              /* @__PURE__ */ React.createElement("p", { key: "desc", className: "mt-1 text-sm leading-6 text-slate-500" }, authView === "login" ? "ใช้ชื่อผู้ใช้และ PIN เพื่อเข้าสู่ระบบ" : authView === "register" ? "สร้างบัญชีใหม่ ตั้ง PIN และรอ OTP ยืนยันอีเมล" : authView === "verifyEmail" ? "กรอก OTP จากอีเมลเพื่อเปิดสิทธิ์รออนุมัติบัญชี" : authView === "adminRecovery" ? "กรอก Recovery Key เพื่อตั้ง PIN ใหม่และปลดล็อกบัญชี admin" : "ขอ OTP ทางอีเมล แล้วตั้ง PIN ใหม่ได้จากหน้านี้")
+              /* @__PURE__ */ React.createElement("p", { key: "desc", className: "mt-1 text-sm leading-6 text-slate-500" }, authView === "login" ? "กรอก PIN 6 หลักเพื่อเข้าสู่ระบบ ระบบจะตรวจให้อัตโนมัติเมื่อกรอกครบ" : authView === "register" ? "สร้างบัญชีใหม่ ตั้ง PIN และรอ OTP ยืนยันอีเมล" : authView === "verifyEmail" ? "กรอก OTP จากอีเมลเพื่อเปิดสิทธิ์รออนุมัติบัญชี" : authView === "adminRecovery" ? "กรอก Recovery Key เพื่อตั้ง PIN ใหม่และปลดล็อกบัญชี admin" : "ขอ OTP ทางอีเมล แล้วตั้ง PIN ใหม่ได้จากหน้านี้")
             ]),
             offlineAuthBox,
             authNoticeBox,
@@ -13322,7 +13340,7 @@ reportViewMode === "live" ? /* @__PURE__ */ React.createElement("div", { key: "p
           )
         )
       );
-    })())));
+    })()))));
   }
 
   const renderPermissionEditorModal = () => {
