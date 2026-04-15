@@ -2877,6 +2877,8 @@
     const canCreatePayments = hasPermissionFrontend("payments.create");
     const [authView, setAuthView] = useState("login");
     const [authNotice, setAuthNotice] = useState({ type: "idle", message: "" });
+    const [loginPin, setLoginPin] = useState("");
+    const loginPinInputRef = useRef(null);
     const [registerForm, setRegisterForm] = useState({ prefix: "", firstName: "", lastName: "", username: "", email: "", pin: "", confirmPin: "" });
     const [forgotForm, setForgotForm] = useState({ identifier: "", otp: "", newPin: "", confirmPin: "" });
     const [emailVerifyForm, setEmailVerifyForm] = useState({ identifier: "", otp: "" });
@@ -2906,6 +2908,7 @@
       setCurrentUserRole("");
       setCurrentUserPermissions([]);
       setPermissionCatalog([]);
+      setLoginPin("");
       setUserAdminRows([]);
       setUserAdminLoaded(false);
       setUserAdminBusyId("");
@@ -6416,6 +6419,7 @@ const getQuickOverviewToneClass = (tone) => {
       const username = usernameField ? String(usernameField.value || "").trim() : "";
       const pin = String(pinField ? pinField.value || "" : "").replace(/\D/g, "").slice(0, 6);
       if (pinField && pinField.value !== pin) pinField.value = pin;
+      setLoginPin(pin);
       if (!isSixDigitPin(pin)) {
         setAuthNotice({ type: "error", message: "กรุณากรอก PIN 6 หลัก" });
         return;
@@ -6449,12 +6453,14 @@ const getQuickOverviewToneClass = (tone) => {
             setCurrentUserRole(normalizedRole);
             setCurrentUserPermissions(normalizedPermissions);
             setPermissionCatalog(Array.isArray(result == null ? void 0 : result.permissionCatalog) ? result.permissionCatalog : []);
+            setLoginPin("");
             setActiveTab("payments");
             setAuthNotice({ type: "idle", message: "" });
             setIsAuthenticated(true);
           } else {
             const loginMessage = (result == null ? void 0 : result.message) || "PIN ไม่ถูกต้อง";
             setAuthNotice({ type: "error", message: loginMessage });
+            setLoginPin("");
             if (form && typeof form.reset === "function") form.reset();
             if (pinField && typeof pinField.focus === "function") pinField.focus();
             resetClientSession(loginMessage);
@@ -6463,6 +6469,7 @@ const getQuickOverviewToneClass = (tone) => {
         }).withFailureHandler((error) => {
           const loginErrorMessage = "เข้าสู่ระบบไม่สำเร็จ: " + (((error == null ? void 0 : error.message) || error || "ไม่ทราบสาเหตุ"));
           setAuthNotice({ type: "error", message: loginErrorMessage });
+          setLoginPin("");
           if (form && typeof form.reset === "function") form.reset();
           if (pinField && typeof pinField.focus === "function") pinField.focus();
           resetClientSession(loginErrorMessage);
@@ -11811,18 +11818,25 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
       const tabClass = (view) => `flex-1 rounded-2xl px-4 py-3 text-sm font-bold transition ${authView === view ? "bg-slate-900 text-white shadow-lg shadow-slate-900/15" : "text-slate-500 hover:bg-white hover:text-slate-700"}`;
       const authNoticeBox = authNotice.type !== "idle" && /* @__PURE__ */ React.createElement("div", { className: `ai-auth-notice ai-auth-notice-${authNotice.type} rounded-2xl px-4 py-3 text-sm font-medium ${noticeClass}` }, authNotice.message);
       const offlineAuthBox = !isOnline && /* @__PURE__ */ React.createElement("div", { className: "ai-offline-notice rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800" }, "อุปกรณ์ออฟไลน์อยู่ ขณะนี้สามารถกรอกข้อมูลได้ แต่การเข้าสู่ระบบหรือขอ OTP จะทำงานเมื่อเชื่อมต่ออินเทอร์เน็ตแล้วเท่านั้น");
+      const loginPinSlots = Array.from({ length: 6 }, (_, index) => loginPin[index] || "");
       const loginForm = /* @__PURE__ */ React.createElement("form", { onSubmit: handleLogin, className: "space-y-5" }, [
         /* @__PURE__ */ React.createElement("div", { key: "pass" }, [
           /* @__PURE__ */ React.createElement("label", { key: "label", className: "mb-2 block text-sm font-bold text-slate-700" }, "PIN 6 หลัก"),
-          /* @__PURE__ */ React.createElement("input", { key: "input", type: "password", name: "pin", placeholder: "กรอก PIN 6 หลัก", autoComplete: "current-password", autoFocus: true, inputMode: "numeric", pattern: "[0-9]{6}", maxLength: 6, required: true, onChange: (e) => {
-            const cleaned = String(e.target.value || "").replace(/\D/g, "").slice(0, 6);
-            if (cleaned !== e.target.value) e.target.value = cleaned;
-            if (authNotice.type !== "idle") setAuthNotice({ type: "idle", message: "" });
-            if (cleaned.length === 6 && !isLoading && isOnline) {
-              if (e.target.form && typeof e.target.form.requestSubmit === "function") e.target.form.requestSubmit();
-              else if (e.target.form) e.target.form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-            }
-          }, className: "w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-center text-2xl font-black tracking-[0.45em] text-slate-700 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100" }),
+          /* @__PURE__ */ React.createElement("div", { key: "pin-ui", className: "relative", onClick: () => {
+            var _a;
+            (_a = loginPinInputRef.current) == null ? void 0 : _a.focus();
+          } }, [
+            /* @__PURE__ */ React.createElement("input", { key: "input", ref: loginPinInputRef, type: "password", name: "pin", value: loginPin, placeholder: "", autoComplete: "current-password", autoFocus: true, inputMode: "numeric", pattern: "[0-9]{6}", maxLength: 6, required: true, onChange: (e) => {
+              const cleaned = String(e.target.value || "").replace(/\D/g, "").slice(0, 6);
+              setLoginPin(cleaned);
+              if (authNotice.type !== "idle") setAuthNotice({ type: "idle", message: "" });
+              if (cleaned.length === 6 && !isLoading && isOnline) {
+                if (e.target.form && typeof e.target.form.requestSubmit === "function") e.target.form.requestSubmit();
+                else if (e.target.form) e.target.form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+              }
+            }, className: "absolute inset-0 z-10 h-full w-full cursor-text opacity-0" }),
+            /* @__PURE__ */ React.createElement("div", { key: "slots", className: "grid grid-cols-6 gap-2 sm:gap-3" }, loginPinSlots.map((digit, index) => /* @__PURE__ */ React.createElement("div", { key: `pin-slot-${index}`, className: `flex h-14 items-center justify-center rounded-2xl border-2 bg-white text-xl font-black shadow-sm transition-all ${digit ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-300"} ${loginPin.length === index ? "ring-4 ring-emerald-100" : ""}` }, digit ? "•" : "" )))
+          ]),
           /* @__PURE__ */ React.createElement("p", { key: "auto-hint", className: "mt-2 text-center text-xs font-medium text-slate-500" }, "กรอกครบ 6 หลัก ระบบจะตรวจรหัสให้อัตโนมัติ")
         ]),
         /* @__PURE__ */ React.createElement("button", { key: "submit", type: "submit", disabled: isLoading || !isOnline, className: "inline-flex w-full items-center justify-center rounded-2xl bg-emerald-700 px-5 py-3.5 text-sm font-black text-white shadow-xl shadow-emerald-700/20 transition hover:-translate-y-0.5 hover:bg-emerald-800 disabled:opacity-60" }, [
