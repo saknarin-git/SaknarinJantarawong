@@ -6415,7 +6415,7 @@ const getQuickOverviewToneClass = (tone) => {
       }
       const form = e.target;
       const pinField = form && form.pin ? form.pin : null;
-      const pin = String(pinField ? pinField.value || "" : "").replace(/\D/g, "").slice(0, 6);
+      const pin = String(loginPin || (pinField ? pinField.value || "" : "")).replace(/\D/g, "").slice(0, 6);
       if (pinField && pinField.value !== pin) pinField.value = pin;
       setLoginPin(pin);
       if (!isSixDigitPin(pin)) {
@@ -11829,8 +11829,13 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
               setLoginPin(cleaned);
               if (authNotice.type !== "idle") setAuthNotice({ type: "idle", message: "" });
               if (cleaned.length === 6 && !isLoading && isOnline) {
-                if (e.target.form && typeof e.target.form.requestSubmit === "function") e.target.form.requestSubmit();
-                else if (e.target.form) e.target.form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+                const formEl = e.target.form;
+                window.setTimeout(() => {
+                  const latestPin = String((formEl && formEl.pin && formEl.pin.value) || cleaned || "").replace(/\D/g, "").slice(0, 6);
+                  if (latestPin.length !== 6 || isLoading || !isOnline) return;
+                  if (formEl && typeof formEl.requestSubmit === "function") formEl.requestSubmit();
+                  else if (formEl) formEl.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+                }, 0);
               }
             }, className: "absolute inset-0 z-10 h-full w-full cursor-text opacity-0" }),
             /* @__PURE__ */ React.createElement("div", { key: "slots", className: "grid grid-cols-6 gap-2 sm:gap-3" }, loginPinSlots.map((digit, index) => /* @__PURE__ */ React.createElement("div", { key: `pin-slot-${index}`, className: `flex h-14 items-center justify-center rounded-2xl border-2 bg-white text-xl font-black shadow-sm transition-all ${digit ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-300"} ${loginPin.length === index ? "ring-4 ring-emerald-100" : ""}` }, digit ? "•" : "" )))
