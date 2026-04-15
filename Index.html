@@ -2574,6 +2574,16 @@
   ensureSafeGoogleScriptRunProxy();
   let __appMounted = false;
   let __bootErrorShown = false;
+  window.setTimeout(function() {
+    if (__appMounted || __bootErrorShown) return;
+    try {
+      var savedTab = sessionStorage.getItem("activeTab");
+      if (savedTab === "settings" || savedTab === "profile") {
+        sessionStorage.setItem("activeTab", "payments");
+      }
+    } catch (e) {}
+    showBootFallback("ระบบเริ่มต้นช้ากว่าปกติ กรุณารีโหลดหน้าใหม่อีกครั้ง");
+  }, 12000);
   const hideBootSplash = () => {
     const boot = document.getElementById("boot-splash");
     if (boot) boot.classList.add("boot-splash-hidden");
@@ -2727,7 +2737,7 @@
     const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem("isAuthenticated") === "true");
     const [activeTab, setActiveTab] = useState(() => {
       const savedTab = sessionStorage.getItem("activeTab");
-      if (savedTab === "settings") return "payments";
+      if (savedTab === "settings" || savedTab === "profile") return "payments";
       return VALID_TABS.has(savedTab) ? savedTab : "payments";
     });
     const isReportsTabActive = activeTab === "reports";

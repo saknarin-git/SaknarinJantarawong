@@ -5945,6 +5945,50 @@ function changePassword(oldPassword, newPassword) {
   return changePin(oldPassword, newPassword, newPassword);
 }
 
+function updateCurrentUserProfile(profilePayloadStr) {
+  var session = requireAuthenticatedSession_();
+  var payload = typeof profilePayloadStr === 'string' ? JSON.parse(profilePayloadStr || '{}') : (profilePayloadStr || {});
+  var email = normalizeEmail_(payload.email);
+  if (!email || !isValidEmail_(email)) {
+    return { status: 'Error', message: 'กรุณากรอกอีเมลให้ถูกต้อง' };
+  }
+
+  var lock = LockService.getScriptLock();
+  var lockAcquired = false;
+  try {
+    lock.waitLock(30000);
+    lockAcquired = true;
+
+    var ss = getDatabaseSpreadsheet_();
+    var usersSheet = ensureUsersSheet_(ss);
+    var userRecord = findUserByUsernameInternal_(usersSheet, session.username);
+    if (!userRecord) return { status: 'Error', message: 'ไม่พบบัญชีผู้ใช้งานในระบบ' };
+
+    var emailOwner = findUserByIdentifierInternal_(usersSheet, email);
+    if (emailOwner && String(emailOwner.userId || '').trim() !== String(userRecord.userId || '').trim()) {
+      return { status: 'Error', message: 'อีเมลนี้ถูกใช้งานแล้ว' };
+    }
+
+    var nowText = getThaiDate(new Date()).dateTime;
+    updateUserCellsByRecord_(usersSheet, userRecord, {
+      email: email,
+      updatedAt: nowText
+    });
+    invalidateUserAuthorizationCache_(userRecord.username);
+    createAuthenticatedSession_({
+      userId: userRecord.userId,
+      username: userRecord.username,
+      fullName: userRecord.fullName,
+      role: userRecord.role
+    });
+    logSystemActionFast(ss, 'อัปเดตอีเมลผู้ใช้', 'ผู้ใช้งาน: ' + (userRecord.username || '-') + ' | Email: ' + email);
+    return { status: 'Success', message: 'บันทึกอีเมลเรียบร้อยแล้ว', email: email };
+  } catch (e) {
+    return { status: 'Error', message: 'ไม่สามารถบันทึกอีเมลได้: ' + (((e && e.message) || e || 'ไม่ทราบสาเหตุ')) };
+  } finally {
+    if (lockAcquired) lock.releaseLock();
+  }
+}
 
 function registerUser(registerPayloadStr) {
   var lock = LockService.getScriptLock();
