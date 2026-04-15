@@ -188,9 +188,11 @@ function getUserAuthorizationSnapshot_(username) {
   var snapshot = {
     userId: String(userRecord.userId || '').trim(),
     username: String(userRecord.username || '').trim(),
-    fullName: String(userRecord.fullName || userRecord.username || '').trim(),
+    fullName: String(userRecord.fullName || buildFullNameFromParts_(userRecord.prefix, userRecord.firstName, userRecord.lastName) || userRecord.username || '').trim(),
     role: normalizeUserRole_(userRecord.role),
     status: normalizeUserStatus_(userRecord.status),
+    emailVerifiedAt: String(userRecord.emailVerifiedAt || '').trim(),
+    hasPin: !!String(userRecord.pinHash || '').trim(),
     updatedAt: String(userRecord.updatedAt || '').trim(),
     permissionsJson: String(userRecord.permissionsJson || '').trim(),
     permissions: getEffectivePermissionsForUserRecord_(userRecord),
@@ -308,6 +310,15 @@ function requireAuthenticatedSession_() {
     );
   }
 
+  if (!String(authSnapshot.emailVerifiedAt || '').trim()) {
+    clearAuthenticatedSession_();
+    throw new Error('FORBIDDEN: บัญชีนี้ยังไม่ได้ยืนยันอีเมล กรุณายืนยันอีเมลก่อนใช้งาน');
+  }
+  if (!authSnapshot.hasPin) {
+    clearAuthenticatedSession_();
+    throw new Error('FORBIDDEN: บัญชีนี้ยังไม่ได้ตั้ง PIN กรุณาตั้ง PIN ก่อนใช้งาน');
+  }
+
   return touchAuthenticatedSession_({
     userId: authSnapshot.userId || sessionData.userId,
     username: authSnapshot.username || sessionData.username,
@@ -381,12 +392,23 @@ var USERS_SHEET_HEADERS = [
   'ResetOtpExpireAt',
   'ResetOtpRequestedAt',
   'ResetOtpUsedAt',
-  'PermissionsJson'
+  'PermissionsJson',
+  'Prefix',
+  'FirstName',
+  'LastName',
+  'EmailVerifiedAt',
+  'PinHash',
+  'PinUniqueKey',
+  'PinUpdatedAt',
+  'EmailVerifyOtpHash',
+  'EmailVerifyOtpExpireAt',
+  'EmailVerifyOtpRequestedAt'
 ];
 var USER_STATUS_PENDING = 'Pending';
 var USER_STATUS_ACTIVE = 'Active';
 var USER_STATUS_SUSPENDED = 'Suspended';
 var PASSWORD_RESET_OTP_TTL_MINUTES = 15;
+var EMAIL_VERIFICATION_OTP_TTL_MINUTES = 15;
 var AUDIT_LOGS_SHEET_NAME = 'AuditLogs';
 var AUDIT_LOGS_HEADERS = [
   'วัน/เดือน/ปี (พ.ศ.)',
@@ -414,7 +436,7 @@ function ensureUsersSheet_(ss) {
     '#dcfce7',
     'เตรียมชีต Users'
   );
-  setPlainTextColumnFormat_(sheet, [1, 2, 4, 5, 8, 9, 10, 11, 12, 13, 14, 15]);
+  setPlainTextColumnFormat_(sheet, [1, 2, 4, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]);
 
   if (sheet.getFrozenRows() < 1) {
     sheet.setFrozenRows(1);
@@ -470,11 +492,13 @@ function migrateLegacyAdminUserToUsersSheet_(ss, usersSheet) {
   }
 
   var nowText = getThaiDate(new Date()).dateTime;
+  var defaultAdminPin = String(PropertiesService.getScriptProperties().getProperty('INITIAL_ADMIN_PIN') || '123456').trim();
+  if (!/^\d{6}$/.test(defaultAdminPin)) defaultAdminPin = '123456';
   var adminRow = [
     Utilities.getUuid(),
     'admin',
     'ผู้ดูแลระบบ',
-    '',
+    'admin@local.invalid',
     adminHash,
     'admin',
     USER_STATUS_ACTIVE,
@@ -483,6 +507,15 @@ function migrateLegacyAdminUserToUsersSheet_(ss, usersSheet) {
     '',
     '',
     '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    nowText,
+    createPasswordHashRecord_(defaultAdminPin),
+    computePinUniqueKey_(defaultAdminPin),
+    nowText,
     '',
     '',
     ''
@@ -509,7 +542,17 @@ function buildUserRecordFromSheetRow_(sheet, rowNumber, rowValues) {
     resetOtpExpireAt: String(row[11] || '').trim(),
     resetOtpRequestedAt: String(row[12] || '').trim(),
     resetOtpUsedAt: String(row[13] || '').trim(),
-    permissionsJson: String(row[14] || '').trim()
+    permissionsJson: String(row[14] || '').trim(),
+    prefix: String(row[15] || '').trim(),
+    firstName: String(row[16] || '').trim(),
+    lastName: String(row[17] || '').trim(),
+    emailVerifiedAt: String(row[18] || '').trim(),
+    pinHash: String(row[19] || '').trim(),
+    pinUniqueKey: String(row[20] || '').trim(),
+    pinUpdatedAt: String(row[21] || '').trim(),
+    emailVerifyOtpHash: String(row[22] || '').trim(),
+    emailVerifyOtpExpireAt: String(row[23] || '').trim(),
+    emailVerifyOtpRequestedAt: String(row[24] || '').trim()
   };
 }
 
@@ -529,6 +572,64 @@ function normalizeUsername_(value) {
 
 function normalizeEmail_(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function normalizePersonPrefix_(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function normalizePersonNamePart_(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function buildFullNameFromParts_(prefix, firstName, lastName) {
+  return [
+    normalizePersonPrefix_(prefix),
+    normalizePersonNamePart_(firstName),
+    normalizePersonNamePart_(lastName)
+  ].filter(function(item) { return !!item; }).join(' ').replace(/\s+/g, ' ').trim();
+}
+
+function normalizePinInput_(value) {
+  return String(value || '').replace(/\D/g, '').trim();
+}
+
+function isValidSixDigitPin_(value) {
+  return /^\d{6}$/.test(String(value || '').trim());
+}
+
+function computePinUniqueKey_(pinValue) {
+  var pin = normalizePinInput_(pinValue);
+  if (!pin) return '';
+  var pepper = String(PropertiesService.getScriptProperties().getProperty('PIN_UNIQUE_PEPPER') || 'PIN_UNIQUE_PEPPER_DEFAULT').trim();
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, pin + '|' + pepper);
+  var out = '';
+  for (var i = 0; i < digest.length; i++) {
+    var hex = (digest[i] & 0xFF).toString(16);
+    if (hex.length < 2) hex = '0' + hex;
+    out += hex;
+  }
+  return out;
+}
+
+function findUserByPinUniqueKeyInternal_(usersSheet, pinUniqueKey) {
+  var normalized = String(pinUniqueKey || '').trim();
+  if (!normalized) return null;
+  var users = getAllUserRecords_(usersSheet);
+  for (var i = 0; i < users.length; i++) {
+    if (String(users[i].pinUniqueKey || '').trim() === normalized) return users[i];
+  }
+  return null;
+}
+
+function ensurePinUniqueAcrossUsers_(usersSheet, pinValue, excludeUserId) {
+  var pinUniqueKey = computePinUniqueKey_(pinValue);
+  if (!pinUniqueKey) throw new Error('PIN ไม่ถูกต้อง');
+  var owner = findUserByPinUniqueKeyInternal_(usersSheet, pinUniqueKey);
+  if (!owner) return pinUniqueKey;
+  var excluded = String(excludeUserId || '').trim();
+  if (excluded && String(owner.userId || '').trim() === excluded) return pinUniqueKey;
+  throw new Error('PIN นี้ถูกใช้งานแล้ว กรุณาเลือก PIN ใหม่');
 }
 
 function isValidEmail_(email) {
@@ -587,7 +688,17 @@ function updateUserCellsByRecord_(usersSheet, userRecord, patch) {
     resetOtpExpireAt: 12,
     resetOtpRequestedAt: 13,
     resetOtpUsedAt: 14,
-    permissionsJson: 15
+    permissionsJson: 15,
+    prefix: 16,
+    firstName: 17,
+    lastName: 18,
+    emailVerifiedAt: 19,
+    pinHash: 20,
+    pinUniqueKey: 21,
+    pinUpdatedAt: 22,
+    emailVerifyOtpHash: 23,
+    emailVerifyOtpExpireAt: 24,
+    emailVerifyOtpRequestedAt: 25
   };
 
   var keys = Object.keys(patch);
@@ -629,7 +740,7 @@ function buildPasswordResetEmailBody_(displayName, otpCode) {
   return [
     'เรียน ' + safeName,
     '',
-    'รหัส OTP สำหรับตั้งรหัสผ่านใหม่ของระบบจัดการเงินกู้คือ: ' + safeOtp,
+    'รหัส OTP สำหรับตั้ง PIN ใหม่ของระบบจัดการเงินกู้คือ: ' + safeOtp,
     'รหัสนี้มีอายุ ' + PASSWORD_RESET_OTP_TTL_MINUTES + ' นาที',
     '',
     'หากคุณไม่ได้เป็นผู้ร้องขอ โปรดละเว้นอีเมลฉบับนี้',
@@ -640,7 +751,9 @@ function buildPasswordResetEmailBody_(displayName, otpCode) {
 
 function normalizeUserRole_(value) {
   var role = String(value || '').trim().toLowerCase();
-  return role === 'admin' ? 'admin' : 'staff';
+  if (!role) return 'staff';
+  if (role === 'admin') return 'admin';
+  return role.replace(/[^a-z0-9._-]/g, '');
 }
 
 function normalizeUserStatus_(value) {
@@ -831,6 +944,10 @@ function sanitizeUserRecordForClient_(userRecord) {
     username: String(userRecord.username || '').trim(),
     fullName: String(userRecord.fullName || '').trim(),
     email: String(userRecord.email || '').trim(),
+    prefix: String(userRecord.prefix || '').trim(),
+    firstName: String(userRecord.firstName || '').trim(),
+    lastName: String(userRecord.lastName || '').trim(),
+    emailVerifiedAt: String(userRecord.emailVerifiedAt || '').trim(),
     role: normalizeUserRole_(userRecord.role),
     status: normalizeUserStatus_(userRecord.status),
     createdAt: String(userRecord.createdAt || '').trim(),
@@ -5518,29 +5635,33 @@ function deleteMember(memberId) {
 // ==========================================
 
 
-function verifyLogin(username, password) {
+function verifyLoginPin(username, pin) {
   var ss = getDatabaseSpreadsheet_();
   var usersSheet = ensureUsersSheet_(ss);
-  var normalizedIdentifier = String(username || '').trim();
-  var normalizedUsernameForLock = normalizeUsername_(normalizedIdentifier);
+  var normalizedUsername = normalizeUsername_(username);
 
-  if (!normalizedUsernameForLock) {
-    return { status: 'Error', message: 'กรุณากรอกชื่อผู้ใช้หรืออีเมล' };
+  if (!normalizedUsername) {
+    return { status: 'Error', message: 'กรุณากรอกชื่อผู้ใช้' };
   }
 
-  var lockoutState = getLoginLockoutState_(normalizedUsernameForLock);
+  var normalizedPin = normalizePinInput_(pin);
+  if (!isValidSixDigitPin_(normalizedPin)) {
+    return { status: 'Error', message: 'กรุณากรอก PIN 6 หลัก' };
+  }
+
+  var lockoutState = getLoginLockoutState_(normalizedUsername);
   if (lockoutState.locked) {
     return { status: 'Locked', message: 'พยายามเข้าสู่ระบบผิดเกินกำหนด กรุณารอ 15 นาทีแล้วลองใหม่อีกครั้ง' };
   }
 
-  var userRecord = findUserByIdentifierInternal_(usersSheet, normalizedIdentifier);
-  if (!userRecord || !userRecord.passwordHash) {
-    var failedStateNotFound = registerFailedLoginAttempt_(normalizedUsernameForLock);
+  var userRecord = findUserByUsernameInternal_(usersSheet, normalizedUsername);
+  if (!userRecord || !userRecord.pinHash) {
+    var failedStateNotFound = registerFailedLoginAttempt_(normalizedUsername);
     return {
       status: failedStateNotFound.locked ? 'Locked' : 'Error',
       message: failedStateNotFound.locked
         ? 'พยายามเข้าสู่ระบบผิดเกินกำหนด กรุณารอ 15 นาทีแล้วลองใหม่อีกครั้ง'
-        : 'ชื่อผู้ใช้/อีเมล หรือรหัสผ่านไม่ถูกต้อง'
+        : 'ชื่อผู้ใช้ หรือ PIN ไม่ถูกต้อง'
     };
   }
 
@@ -5554,23 +5675,19 @@ function verifyLogin(username, password) {
     };
   }
 
-  var passwordMatched = verifyPasswordAgainstStoredHash_(password || '', userRecord.passwordHash);
-  if (!passwordMatched) {
-    var failedState = registerFailedLoginAttempt_(userRecord.username || normalizedUsernameForLock);
+  if (!String(userRecord.emailVerifiedAt || '').trim()) {
+    return { status: 'Error', message: 'บัญชีนี้ยังไม่ได้ยืนยันอีเมล กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ' };
+  }
+
+  var pinMatched = verifyPasswordAgainstStoredHash_(normalizedPin, userRecord.pinHash);
+  if (!pinMatched) {
+    var failedState = registerFailedLoginAttempt_(userRecord.username || normalizedUsername);
     return {
       status: failedState.locked ? 'Locked' : 'Error',
       message: failedState.locked
         ? 'พยายามเข้าสู่ระบบผิดเกินกำหนด กรุณารอ 15 นาทีแล้วลองใหม่อีกครั้ง'
-        : 'ชื่อผู้ใช้/อีเมล หรือรหัสผ่านไม่ถูกต้อง'
+        : 'ชื่อผู้ใช้ หรือ PIN ไม่ถูกต้อง'
     };
-  }
-
-  if (isLegacyPasswordHash_(userRecord.passwordHash)) {
-    var upgradedHash = createPasswordHashRecord_(password || '');
-    updateUserCellsByRecord_(usersSheet, userRecord, {
-      passwordHash: upgradedHash,
-      updatedAt: getThaiDate(new Date()).dateTime
-    });
   }
 
   var loginAt = getThaiDate(new Date()).dateTime;
@@ -5579,8 +5696,8 @@ function verifyLogin(username, password) {
     updatedAt: loginAt
   });
 
-  clearFailedLoginAttempts_(userRecord.username || normalizedUsernameForLock);
-  invalidateUserAuthorizationCache_(userRecord.username || normalizedUsernameForLock);
+  clearFailedLoginAttempts_(userRecord.username || normalizedUsername);
+  invalidateUserAuthorizationCache_(userRecord.username || normalizedUsername);
   createAuthenticatedSession_({
     userId: userRecord.userId,
     username: userRecord.username,
@@ -5598,8 +5715,12 @@ function verifyLogin(username, password) {
   };
 }
 
+function verifyLogin(username, password) {
+  return verifyLoginPin(username, password);
+}
 
-function changePassword(oldPassword, newPassword) {
+
+function changePin(currentPin, newPin, confirmPin) {
   var session = requireAuthenticatedSession_();
 
   var lock = LockService.getScriptLock();
@@ -5613,19 +5734,26 @@ function changePassword(oldPassword, newPassword) {
     var userRecord = findUserByUsernameInternal_(usersSheet, session.username);
 
     if (!userRecord) return 'Error: ไม่พบบัญชีผู้ใช้งานในระบบ';
-    if (!verifyPasswordAgainstStoredHash_(oldPassword || '', userRecord.passwordHash)) return 'InvalidOldPassword';
+    if (!verifyPasswordAgainstStoredHash_(normalizePinInput_(currentPin), userRecord.pinHash)) return 'InvalidOldPassword';
 
-    var normalizedNewPassword = String(newPassword || '');
-    if (normalizedNewPassword.length < 8) {
-      return 'Error: รหัสผ่านใหม่ต้องยาวอย่างน้อย 8 ตัวอักษร';
+    var normalizedNewPin = normalizePinInput_(newPin);
+    var normalizedConfirmPin = normalizePinInput_(confirmPin);
+    if (!isValidSixDigitPin_(normalizedNewPin)) {
+      return 'Error: PIN ใหม่ต้องเป็นตัวเลข 6 หลัก';
     }
-    if (verifyPasswordAgainstStoredHash_(normalizedNewPassword, userRecord.passwordHash)) {
-      return 'Error: รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านเดิม';
+    if (normalizedNewPin !== normalizedConfirmPin) {
+      return 'Error: ยืนยัน PIN ใหม่ไม่ตรงกัน';
+    }
+    if (verifyPasswordAgainstStoredHash_(normalizedNewPin, userRecord.pinHash)) {
+      return 'Error: PIN ใหม่ต้องไม่ซ้ำกับ PIN เดิม';
     }
 
+    var pinUniqueKey = ensurePinUniqueAcrossUsers_(usersSheet, normalizedNewPin, userRecord.userId);
     var nowText = getThaiDate(new Date()).dateTime;
     updateUserCellsByRecord_(usersSheet, userRecord, {
-      passwordHash: createPasswordHashRecord_(normalizedNewPassword),
+      pinHash: createPasswordHashRecord_(normalizedNewPin),
+      pinUniqueKey: pinUniqueKey,
+      pinUpdatedAt: nowText,
       updatedAt: nowText,
       resetOtpHash: '',
       resetOtpExpireAt: '',
@@ -5640,13 +5768,17 @@ function changePassword(oldPassword, newPassword) {
       fullName: userRecord.fullName,
       role: userRecord.role
     });
-    logSystemActionFast(ss, 'เปลี่ยนรหัสผ่าน', 'ผู้ใช้งาน: ' + (userRecord.username || '-'));
+    logSystemActionFast(ss, 'เปลี่ยน PIN', 'ผู้ใช้งาน: ' + (userRecord.username || '-'));
     return 'Success';
   } catch(e) {
     return 'Error: ' + e.toString();
   } finally {
     if (lockAcquired) lock.releaseLock();
   }
+}
+
+function changePassword(oldPassword, newPassword) {
+  return changePin(oldPassword, newPassword, newPassword);
 }
 
 
@@ -5658,18 +5790,21 @@ function registerUser(registerPayloadStr) {
     lockAcquired = true;
 
     var payload = typeof registerPayloadStr === 'string' ? JSON.parse(registerPayloadStr) : (registerPayloadStr || {});
-    var fullName = String(payload.fullName || '').replace(/\s+/g, ' ').trim();
+    var prefix = normalizePersonPrefix_(payload.prefix || payload.title);
+    var firstName = normalizePersonNamePart_(payload.firstName || '');
+    var lastName = normalizePersonNamePart_(payload.lastName || '');
+    var fullName = buildFullNameFromParts_(prefix, firstName, lastName);
     var username = normalizeUsername_(payload.username);
     var email = normalizeEmail_(payload.email);
-    var password = String(payload.password || '');
-    var confirmPassword = String(payload.confirmPassword || '');
+    var pin = normalizePinInput_(payload.pin);
+    var confirmPin = normalizePinInput_(payload.confirmPin);
 
     if (!fullName) return { status: 'Error', message: 'กรุณากรอกชื่อ-สกุล' };
     if (!username || username.length < 4) return { status: 'Error', message: 'ชื่อผู้ใช้ต้องยาวอย่างน้อย 4 ตัวอักษร' };
     if (!/^[a-zA-Z0-9._-]+$/.test(username)) return { status: 'Error', message: 'ชื่อผู้ใช้ใช้ได้เฉพาะภาษาอังกฤษ ตัวเลข จุด ขีด และขีดล่าง' };
     if (!email || !isValidEmail_(email)) return { status: 'Error', message: 'กรุณากรอกอีเมลให้ถูกต้อง' };
-    if (password.length < 8) return { status: 'Error', message: 'รหัสผ่านต้องยาวอย่างน้อย 8 ตัวอักษร' };
-    if (password !== confirmPassword) return { status: 'Error', message: 'ยืนยันรหัสผ่านไม่ตรงกัน' };
+    if (!isValidSixDigitPin_(pin)) return { status: 'Error', message: 'PIN ต้องเป็นตัวเลข 6 หลัก' };
+    if (pin !== confirmPin) return { status: 'Error', message: 'ยืนยัน PIN ไม่ตรงกัน' };
 
     var ss = getDatabaseSpreadsheet_();
     var usersSheet = ensureUsersSheet_(ss);
@@ -5682,13 +5817,17 @@ function registerUser(registerPayloadStr) {
       return { status: 'Error', message: 'อีเมลนี้ถูกใช้งานแล้ว' };
     }
 
+    var pinUniqueKey = ensurePinUniqueAcrossUsers_(usersSheet, pin, '');
+    var emailVerifyOtpCode = generateSixDigitOtp_();
+
     var nowText = getThaiDate(new Date()).dateTime;
+    var emailVerifyExpireAt = getThaiDate(addMinutesToDate_(new Date(), EMAIL_VERIFICATION_OTP_TTL_MINUTES)).dateTime;
     appendRowsSafely_(usersSheet, [[
       Utilities.getUuid(),
       username,
       fullName,
       email,
-      createPasswordHashRecord_(password),
+      '',
       'staff',
       USER_STATUS_PENDING,
       nowText,
@@ -5697,14 +5836,42 @@ function registerUser(registerPayloadStr) {
       '',
       '',
       '',
-      ''
+      '',
+      '',
+      prefix,
+      firstName,
+      lastName,
+      '',
+      createPasswordHashRecord_(pin),
+      pinUniqueKey,
+      nowText,
+      createPasswordHashRecord_(emailVerifyOtpCode),
+      emailVerifyExpireAt,
+      nowText
     ]], 'เพิ่มผู้ใช้ใหม่');
+
+    MailApp.sendEmail({
+      to: email,
+      subject: 'OTP ยืนยันอีเมล - ระบบจัดการเงินกู้ บ้านพิตำ',
+      body: [
+        'เรียน ' + fullName,
+        '',
+        'รหัส OTP สำหรับยืนยันอีเมลคือ: ' + emailVerifyOtpCode,
+        'รหัสนี้มีอายุ ' + EMAIL_VERIFICATION_OTP_TTL_MINUTES + ' นาที',
+        '',
+        'เมื่อยืนยันอีเมลแล้ว บัญชีจะพร้อมรอผู้ดูแลอนุมัติการใช้งาน',
+        '',
+        'ระบบจัดการเงินกู้ บ้านพิตำ'
+      ].join('\n')
+    });
 
     clearAppCache_();
     logSystemActionFast(ss, 'สมัครใช้งาน', 'ผู้ใช้งานใหม่: ' + username + ' | Email: ' + email, username);
     return {
       status: 'Success',
-      message: 'สมัครใช้งานสำเร็จ บัญชีของคุณถูกบันทึกแล้วและอยู่ระหว่างรออนุมัติจากผู้ดูแลระบบ'
+      message: 'สมัครใช้งานสำเร็จ กรุณากรอก OTP ที่ส่งไปยังอีเมลเพื่อยืนยันอีเมลก่อนรอผู้ดูแลอนุมัติ',
+      requiresEmailVerification: true,
+      identifier: username
     };
   } catch(e) {
     return { status: 'Error', message: e.toString() };
@@ -5713,8 +5880,104 @@ function registerUser(registerPayloadStr) {
   }
 }
 
+function requestEmailVerificationOtp(identifier) {
+  var lock = LockService.getScriptLock();
+  var lockAcquired = false;
+  try {
+    lock.waitLock(30000);
+    lockAcquired = true;
 
-function requestPasswordResetOtp(identifier) {
+    var normalizedIdentifier = String(identifier || '').trim();
+    if (!normalizedIdentifier) return { status: 'Error', message: 'กรุณากรอกชื่อผู้ใช้หรืออีเมล' };
+
+    var ss = getDatabaseSpreadsheet_();
+    var usersSheet = ensureUsersSheet_(ss);
+    var userRecord = findUserByIdentifierInternal_(usersSheet, normalizedIdentifier);
+    if (!userRecord || !userRecord.email) return { status: 'Error', message: 'ไม่พบบัญชีผู้ใช้งาน' };
+    if (String(userRecord.emailVerifiedAt || '').trim()) return { status: 'Success', message: 'บัญชีนี้ยืนยันอีเมลแล้ว' };
+
+    var otpCode = generateSixDigitOtp_();
+    var nowText = getThaiDate(new Date()).dateTime;
+    var expireAtText = getThaiDate(addMinutesToDate_(new Date(), EMAIL_VERIFICATION_OTP_TTL_MINUTES)).dateTime;
+
+    updateUserCellsByRecord_(usersSheet, userRecord, {
+      emailVerifyOtpHash: createPasswordHashRecord_(otpCode),
+      emailVerifyOtpExpireAt: expireAtText,
+      emailVerifyOtpRequestedAt: nowText,
+      updatedAt: nowText
+    });
+
+    MailApp.sendEmail({
+      to: userRecord.email,
+      subject: 'OTP ยืนยันอีเมล - ระบบจัดการเงินกู้ บ้านพิตำ',
+      body: [
+        'เรียน ' + (userRecord.fullName || userRecord.username || 'ผู้ใช้งาน'),
+        '',
+        'รหัส OTP สำหรับยืนยันอีเมลคือ: ' + otpCode,
+        'รหัสนี้มีอายุ ' + EMAIL_VERIFICATION_OTP_TTL_MINUTES + ' นาที',
+        '',
+        'ระบบจัดการเงินกู้ บ้านพิตำ'
+      ].join('\n')
+    });
+
+    clearAppCache_();
+    return { status: 'Success', message: 'ส่ง OTP ยืนยันอีเมลแล้ว' };
+  } catch (e) {
+    return { status: 'Error', message: 'ส่ง OTP ยืนยันอีเมลไม่สำเร็จ: ' + e.toString() };
+  } finally {
+    if (lockAcquired) lock.releaseLock();
+  }
+}
+
+function verifyEmailWithOtp(payloadStr) {
+  var lock = LockService.getScriptLock();
+  var lockAcquired = false;
+  try {
+    lock.waitLock(30000);
+    lockAcquired = true;
+
+    var payload = typeof payloadStr === 'string' ? JSON.parse(payloadStr) : (payloadStr || {});
+    var identifier = String(payload.identifier || '').trim();
+    var otp = String(payload.otp || '').trim();
+    if (!identifier) return { status: 'Error', message: 'กรุณากรอกชื่อผู้ใช้หรืออีเมล' };
+    if (!otp) return { status: 'Error', message: 'กรุณากรอก OTP' };
+
+    var ss = getDatabaseSpreadsheet_();
+    var usersSheet = ensureUsersSheet_(ss);
+    var userRecord = findUserByIdentifierInternal_(usersSheet, identifier);
+    if (!userRecord) return { status: 'Error', message: 'ไม่พบบัญชีผู้ใช้งาน' };
+    if (String(userRecord.emailVerifiedAt || '').trim()) return { status: 'Success', message: 'บัญชีนี้ยืนยันอีเมลแล้ว' };
+    if (!userRecord.emailVerifyOtpHash || !userRecord.emailVerifyOtpExpireAt) return { status: 'Error', message: 'ไม่พบ OTP ที่ใช้งานได้ กรุณาขอ OTP ใหม่' };
+
+    var expireParts = parseThaiDateParts_(userRecord.emailVerifyOtpExpireAt);
+    if (!expireParts || !expireParts.nativeDate || expireParts.nativeDate.getTime() < new Date().getTime()) {
+      return { status: 'Error', message: 'OTP หมดอายุแล้ว กรุณาขอ OTP ใหม่' };
+    }
+
+    if (!verifyPasswordAgainstStoredHash_(otp, userRecord.emailVerifyOtpHash)) {
+      return { status: 'Error', message: 'OTP ไม่ถูกต้อง' };
+    }
+
+    var nowText = getThaiDate(new Date()).dateTime;
+    updateUserCellsByRecord_(usersSheet, userRecord, {
+      emailVerifiedAt: nowText,
+      emailVerifyOtpHash: '',
+      emailVerifyOtpExpireAt: '',
+      emailVerifyOtpRequestedAt: '',
+      updatedAt: nowText
+    });
+    clearAppCache_();
+    logSystemActionFast(ss, 'ยืนยันอีเมลผู้ใช้', 'ผู้ใช้งาน: ' + (userRecord.username || '-'), userRecord.username || 'system');
+    return { status: 'Success', message: 'ยืนยันอีเมลสำเร็จ กรุณารอผู้ดูแลอนุมัติบัญชี' };
+  } catch (e) {
+    return { status: 'Error', message: e.toString() };
+  } finally {
+    if (lockAcquired) lock.releaseLock();
+  }
+}
+
+
+function requestPinResetOtp(identifier) {
   var lock = LockService.getScriptLock();
   var lockAcquired = false;
   try {
@@ -5739,8 +6002,13 @@ function requestPasswordResetOtp(identifier) {
       setPasswordResetRequestThrottle_(normalizedIdentifier);
       return {
         status: 'Success',
-        message: 'ถ้าพบบัญชีที่ตรงกัน ระบบจะส่งรหัส OTP ไปยังอีเมลที่ลงทะเบียนไว้'
+        message: 'ถ้าพบบัญชีที่ตรงกัน ระบบจะส่งรหัส OTP ไปยังอีเมลที่ยืนยันไว้'
       };
+    }
+
+    if (!String(userRecord.emailVerifiedAt || '').trim()) {
+      setPasswordResetRequestThrottle_(normalizedIdentifier);
+      return { status: 'Error', message: 'บัญชีนี้ยังไม่ได้ยืนยันอีเมล กรุณายืนยันอีเมลก่อน' };
     }
 
     var userCooldownSeconds = Math.max(
@@ -5767,7 +6035,7 @@ function requestPasswordResetOtp(identifier) {
 
     MailApp.sendEmail({
       to: userRecord.email,
-      subject: 'OTP ตั้งรหัสผ่านใหม่ - ระบบจัดการเงินกู้ บ้านพิตำ',
+      subject: 'OTP ตั้ง PIN ใหม่ - ระบบจัดการเงินกู้ บ้านพิตำ',
       body: buildPasswordResetEmailBody_(userRecord.fullName || userRecord.username, otpCode)
     });
 
@@ -5779,7 +6047,7 @@ function requestPasswordResetOtp(identifier) {
     clearPasswordResetVerifyFailures_(userRecord.email);
 
     clearAppCache_();
-    logSystemActionFast(ss, 'ขอรหัส OTP รีเซ็ตรหัสผ่าน', 'ผู้ใช้งาน: ' + (userRecord.username || '-') + ' | Email: ' + maskEmailForDisplay_(userRecord.email), userRecord.username);
+    logSystemActionFast(ss, 'ขอรหัส OTP รีเซ็ต PIN', 'ผู้ใช้งาน: ' + (userRecord.username || '-') + ' | Email: ' + maskEmailForDisplay_(userRecord.email), userRecord.username);
     return {
       status: 'Success',
       message: 'ส่งรหัส OTP ไปยังอีเมล ' + maskEmailForDisplay_(userRecord.email) + ' แล้ว'
@@ -5791,8 +6059,12 @@ function requestPasswordResetOtp(identifier) {
   }
 }
 
+function requestPasswordResetOtp(identifier) {
+  return requestPinResetOtp(identifier);
+}
 
-function resetPasswordWithOtp(resetPayloadStr) {
+
+function resetPinWithOtp(resetPayloadStr) {
   var lock = LockService.getScriptLock();
   var lockAcquired = false;
   try {
@@ -5802,13 +6074,13 @@ function resetPasswordWithOtp(resetPayloadStr) {
     var payload = typeof resetPayloadStr === 'string' ? JSON.parse(resetPayloadStr) : (resetPayloadStr || {});
     var identifier = String(payload.identifier || '').trim();
     var otpCode = String(payload.otp || '').trim();
-    var newPassword = String(payload.newPassword || '');
-    var confirmPassword = String(payload.confirmPassword || '');
+    var newPin = normalizePinInput_(payload.newPin);
+    var confirmPin = normalizePinInput_(payload.confirmPin);
 
     if (!identifier) return { status: 'Error', message: 'กรุณากรอกชื่อผู้ใช้หรืออีเมล' };
     if (!otpCode) return { status: 'Error', message: 'กรุณากรอกรหัส OTP' };
-    if (newPassword.length < 8) return { status: 'Error', message: 'รหัสผ่านใหม่ต้องยาวอย่างน้อย 8 ตัวอักษร' };
-    if (newPassword !== confirmPassword) return { status: 'Error', message: 'ยืนยันรหัสผ่านไม่ตรงกัน' };
+    if (!isValidSixDigitPin_(newPin)) return { status: 'Error', message: 'PIN ใหม่ต้องเป็นตัวเลข 6 หลัก' };
+    if (newPin !== confirmPin) return { status: 'Error', message: 'ยืนยัน PIN ใหม่ไม่ตรงกัน' };
 
     var verifyLockSeconds = getPasswordResetVerifyLockRemainingSeconds_(identifier);
     if (verifyLockSeconds > 0) {
@@ -5819,6 +6091,7 @@ function resetPasswordWithOtp(resetPayloadStr) {
     var usersSheet = ensureUsersSheet_(ss);
     var userRecord = findUserByIdentifierInternal_(usersSheet, identifier);
     if (!userRecord) return { status: 'Error', message: 'ไม่พบบัญชีผู้ใช้งานที่ตรงกับข้อมูลที่กรอก' };
+    if (!String(userRecord.emailVerifiedAt || '').trim()) return { status: 'Error', message: 'บัญชีนี้ยังไม่ได้ยืนยันอีเมล' };
 
     var userVerifyLockSeconds = Math.max(
       getPasswordResetVerifyLockRemainingSeconds_(userRecord.username),
@@ -5845,13 +6118,16 @@ function resetPasswordWithOtp(resetPayloadStr) {
       return { status: 'Error', message: 'OTP ไม่ถูกต้อง' };
     }
 
-    if (verifyPasswordAgainstStoredHash_(newPassword, userRecord.passwordHash)) {
-      return { status: 'Error', message: 'รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านเดิม' };
+    if (verifyPasswordAgainstStoredHash_(newPin, userRecord.pinHash)) {
+      return { status: 'Error', message: 'PIN ใหม่ต้องไม่ซ้ำกับ PIN เดิม' };
     }
 
+    var pinUniqueKey = ensurePinUniqueAcrossUsers_(usersSheet, newPin, userRecord.userId);
     var nowText = getThaiDate(new Date()).dateTime;
     updateUserCellsByRecord_(usersSheet, userRecord, {
-      passwordHash: createPasswordHashRecord_(newPassword),
+      pinHash: createPasswordHashRecord_(newPin),
+      pinUniqueKey: pinUniqueKey,
+      pinUpdatedAt: nowText,
       updatedAt: nowText,
       resetOtpHash: '',
       resetOtpExpireAt: '',
@@ -5865,10 +6141,90 @@ function resetPasswordWithOtp(resetPayloadStr) {
     clearPasswordResetVerifyFailures_(userRecord.username);
     clearPasswordResetVerifyFailures_(userRecord.email);
     clearAppCache_();
-    logSystemActionFast(ss, 'รีเซ็ตรหัสผ่าน', 'ผู้ใช้งาน: ' + (userRecord.username || '-'), userRecord.username);
-    return { status: 'Success', message: 'ตั้งรหัสผ่านใหม่เรียบร้อยแล้ว กรุณาเข้าสู่ระบบอีกครั้ง' };
+    logSystemActionFast(ss, 'รีเซ็ต PIN', 'ผู้ใช้งาน: ' + (userRecord.username || '-'), userRecord.username);
+    return { status: 'Success', message: 'ตั้ง PIN ใหม่เรียบร้อยแล้ว กรุณาเข้าสู่ระบบอีกครั้ง' };
   } catch(e) {
     return { status: 'Error', message: e.toString() };
+  } finally {
+    if (lockAcquired) lock.releaseLock();
+  }
+}
+
+function resetPasswordWithOtp(resetPayloadStr) {
+  var payload = typeof resetPayloadStr === 'string' ? JSON.parse(resetPayloadStr) : (resetPayloadStr || {});
+  payload.newPin = payload.newPin || payload.newPassword;
+  payload.confirmPin = payload.confirmPin || payload.confirmPassword;
+  return resetPinWithOtp(payload);
+}
+
+function emergencyRestoreAdminAccess(recoveryKey, newPin) {
+  var providedKey = String(recoveryKey || '').trim();
+  var configuredKey = String(PropertiesService.getScriptProperties().getProperty('ADMIN_EMERGENCY_RECOVERY_KEY') || '').trim();
+  if (!configuredKey || configuredKey.length < 16) {
+    return {
+      status: 'Error',
+      message: 'ยังไม่ได้ตั้งค่า Script Property: ADMIN_EMERGENCY_RECOVERY_KEY (อย่างน้อย 16 ตัวอักษร)'
+    };
+  }
+  if (!providedKey || providedKey !== configuredKey) {
+    return { status: 'Error', message: 'Recovery key ไม่ถูกต้อง' };
+  }
+
+  var normalizedPin = normalizePinInput_(newPin);
+  if (!isValidSixDigitPin_(normalizedPin)) {
+    return { status: 'Error', message: 'PIN ใหม่ต้องเป็นตัวเลข 6 หลัก' };
+  }
+
+  var lock = LockService.getScriptLock();
+  var lockAcquired = false;
+  try {
+    lock.waitLock(30000);
+    lockAcquired = true;
+
+    var ss = getDatabaseSpreadsheet_();
+    var usersSheet = ensureUsersSheet_(ss);
+    var adminUser = findUserByUsernameInternal_(usersSheet, 'admin');
+    if (!adminUser) {
+      migrateLegacyAdminUserToUsersSheet_(ss, usersSheet);
+      adminUser = findUserByUsernameInternal_(usersSheet, 'admin');
+    }
+    if (!adminUser) {
+      return { status: 'Error', message: 'ไม่พบบัญชี admin และไม่สามารถสร้างใหม่ได้' };
+    }
+
+    var pinUniqueKey = ensurePinUniqueAcrossUsers_(usersSheet, normalizedPin, adminUser.userId);
+    var nowText = getThaiDate(new Date()).dateTime;
+    updateUserCellsByRecord_(usersSheet, adminUser, {
+      fullName: String(adminUser.fullName || 'ผู้ดูแลระบบ').trim() || 'ผู้ดูแลระบบ',
+      role: 'admin',
+      status: USER_STATUS_ACTIVE,
+      emailVerifiedAt: String(adminUser.emailVerifiedAt || nowText).trim() || nowText,
+      pinHash: createPasswordHashRecord_(normalizedPin),
+      pinUniqueKey: pinUniqueKey,
+      pinUpdatedAt: nowText,
+      updatedAt: nowText,
+      resetOtpHash: '',
+      resetOtpExpireAt: '',
+      resetOtpRequestedAt: '',
+      resetOtpUsedAt: '',
+      emailVerifyOtpHash: '',
+      emailVerifyOtpExpireAt: '',
+      emailVerifyOtpRequestedAt: ''
+    });
+
+    clearFailedLoginAttempts_('admin');
+    invalidateUserAuthorizationCache_('admin');
+    clearAuthenticatedSession_();
+    clearAppCache_();
+    logSystemActionFast(ss, 'กู้บัญชีแอดมินฉุกเฉิน', 'รีเซ็ต PIN และปลดล็อกบัญชี admin ผ่าน emergency recovery', 'system');
+
+    return {
+      status: 'Success',
+      message: 'กู้บัญชี admin สำเร็จ กรุณาเข้าสู่ระบบด้วย PIN ใหม่',
+      username: 'admin'
+    };
+  } catch (e) {
+    return { status: 'Error', message: 'กู้บัญชี admin ไม่สำเร็จ: ' + e.toString() };
   } finally {
     if (lockAcquired) lock.releaseLock();
   }
@@ -6533,16 +6889,19 @@ function setupDatabase() {
 // 8. END OF DAY CLOSE
 // ==========================================
 
-function buildThaiDateParts_(day, month, yearBe) {
+function buildThaiDateParts_(day, month, yearBe, timeParts) {
   day = Number(day) || 0;
   month = Number(month) || 0;
   yearBe = Number(yearBe) || 0;
+  var hour = Number(timeParts && timeParts.hour) || 0;
+  var minute = Number(timeParts && timeParts.minute) || 0;
+  var second = Number(timeParts && timeParts.second) || 0;
 
   if (yearBe > 0 && yearBe < 2400) yearBe += 543;
   if (!day || !month || !yearBe) return null;
 
   var gregYear = yearBe - 543;
-  var nativeDate = new Date(gregYear, month - 1, day);
+  var nativeDate = new Date(gregYear, month - 1, day, hour, minute, second, 0);
   if (isNaN(nativeDate.getTime()) ||
       nativeDate.getFullYear() !== gregYear ||
       nativeDate.getMonth() !== month - 1 ||
@@ -6554,7 +6913,12 @@ function buildThaiDateParts_(day, month, yearBe) {
     day: day,
     month: month,
     yearBe: yearBe,
-    dateOnly: padNumber_(day, 2) + '/' + padNumber_(month, 2) + '/' + yearBe
+    hour: hour,
+    minute: minute,
+    second: second,
+    nativeDate: nativeDate,
+    dateOnly: padNumber_(day, 2) + '/' + padNumber_(month, 2) + '/' + yearBe,
+    dateTime: padNumber_(day, 2) + '/' + padNumber_(month, 2) + '/' + yearBe + ' ' + padNumber_(hour, 2) + ':' + padNumber_(minute, 2) + ':' + padNumber_(second, 2)
   };
 }
 
@@ -6571,7 +6935,16 @@ function parseThaiDateParts_(value) {
   if (Object.prototype.toString.call(value) === '[object Date]') {
     var normalizedDate = normalizeDateObjectForThai_(value);
     result = normalizedDate
-      ? buildThaiDateParts_(normalizedDate.getDate(), normalizedDate.getMonth() + 1, normalizedDate.getFullYear() + 543)
+      ? buildThaiDateParts_(
+          normalizedDate.getDate(),
+          normalizedDate.getMonth() + 1,
+          normalizedDate.getFullYear() + 543,
+          {
+            hour: normalizedDate.getHours(),
+            minute: normalizedDate.getMinutes(),
+            second: normalizedDate.getSeconds()
+          }
+        )
       : null;
     EXECUTION_THAI_DATE_PARTS_CACHE_[cacheKey] = result;
     return result;
@@ -6589,17 +6962,24 @@ function parseThaiDateParts_(value) {
     return null;
   }
 
+  var timeMatch = text.match(/(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+  var parsedTime = {
+    hour: Number(timeMatch && timeMatch[1]) || 0,
+    minute: Number(timeMatch && timeMatch[2]) || 0,
+    second: Number(timeMatch && timeMatch[3]) || 0
+  };
+
   var datePart = text.split(' ')[0].trim();
   var slashMatch = datePart.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (slashMatch) {
-    result = buildThaiDateParts_(slashMatch[1], slashMatch[2], slashMatch[3]);
+    result = buildThaiDateParts_(slashMatch[1], slashMatch[2], slashMatch[3], parsedTime);
     EXECUTION_THAI_DATE_PARTS_CACHE_[cacheKey] = result;
     return result;
   }
 
   var isoMatch = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (isoMatch) {
-    result = buildThaiDateParts_(isoMatch[3], isoMatch[2], Number(isoMatch[1]) + 543);
+    result = buildThaiDateParts_(isoMatch[3], isoMatch[2], Number(isoMatch[1]) + 543, parsedTime);
     EXECUTION_THAI_DATE_PARTS_CACHE_[cacheKey] = result;
     return result;
   }
