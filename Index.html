@@ -2765,14 +2765,14 @@
   const Bell = (p) => /* @__PURE__ */ React.createElement(Icon, { name: "bell", ...p });
   const getAppRenderScope = () => window.__APP_RENDER_SCOPE__ || {};
   function App() {
-    const DIRECT_ACCESS_CLIENT_PROFILE = {
-      username: "admin",
-      fullName: "ผู้ดูแลระบบ",
+    const DEFAULT_CLIENT_PROFILE = {
+      username: "",
+      fullName: "",
       email: "",
-      role: "admin",
+      role: "",
       permissions: []
     };
-    const [isAuthenticated, setIsAuthenticated] = useState(true);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [activeTab, setActiveTab] = useState(() => {
       const savedTab = sessionStorage.getItem("activeTab");
       if (savedTab === "settings") return "profile";
@@ -2782,16 +2782,16 @@
     const [isLoading, setIsLoading] = useState(false);
     const [isDataLoaded, setIsDataLoaded] = useState(false);
     const [initialLoadError, setInitialLoadError] = useState(null);
-    const [currentUsername, setCurrentUsername] = useState(() => sessionStorage.getItem("currentUsername") || DIRECT_ACCESS_CLIENT_PROFILE.username);
-    const [currentUserFullName, setCurrentUserFullName] = useState(() => sessionStorage.getItem("currentUserFullName") || DIRECT_ACCESS_CLIENT_PROFILE.fullName);
-    const [currentUserEmail, setCurrentUserEmail] = useState(() => sessionStorage.getItem("currentUserEmail") || DIRECT_ACCESS_CLIENT_PROFILE.email);
-    const [currentUserRole, setCurrentUserRole] = useState(() => sessionStorage.getItem("currentUserRole") || DIRECT_ACCESS_CLIENT_PROFILE.role);
+    const [currentUsername, setCurrentUsername] = useState(() => sessionStorage.getItem("currentUsername") || DEFAULT_CLIENT_PROFILE.username);
+    const [currentUserFullName, setCurrentUserFullName] = useState(() => sessionStorage.getItem("currentUserFullName") || DEFAULT_CLIENT_PROFILE.fullName);
+    const [currentUserEmail, setCurrentUserEmail] = useState(() => sessionStorage.getItem("currentUserEmail") || DEFAULT_CLIENT_PROFILE.email);
+    const [currentUserRole, setCurrentUserRole] = useState(() => sessionStorage.getItem("currentUserRole") || DEFAULT_CLIENT_PROFILE.role);
     const [currentUserPermissions, setCurrentUserPermissions] = useState(() => {
       try {
         const storedPermissions = JSON.parse(sessionStorage.getItem("currentUserPermissions") || "[]");
-        return Array.isArray(storedPermissions) ? storedPermissions : DIRECT_ACCESS_CLIENT_PROFILE.permissions;
+        return Array.isArray(storedPermissions) ? storedPermissions : DEFAULT_CLIENT_PROFILE.permissions;
       } catch (e) {
-        return DIRECT_ACCESS_CLIENT_PROFILE.permissions;
+        return DEFAULT_CLIENT_PROFILE.permissions;
       }
     });
     const [staffPortalUnlocked, setStaffPortalUnlocked] = useState(() => sessionStorage.getItem("staffPortalUnlocked") === "true");
@@ -2940,14 +2940,14 @@
     const [sessionHealth, setSessionHealth] = useState({ status: "idle", message: "", checkedAt: 0 });
     const resetClientSession = useCallback((message) => {
       sessionStorage.removeItem("gasSessionToken");
-      setIsAuthenticated(true);
-      setCurrentUsername(DIRECT_ACCESS_CLIENT_PROFILE.username);
-      setCurrentUserFullName(DIRECT_ACCESS_CLIENT_PROFILE.fullName);
-      setCurrentUserEmail(DIRECT_ACCESS_CLIENT_PROFILE.email);
-      setProfileEmailDraft(DIRECT_ACCESS_CLIENT_PROFILE.email);
+      setIsAuthenticated(false);
+      setCurrentUsername(DEFAULT_CLIENT_PROFILE.username);
+      setCurrentUserFullName(DEFAULT_CLIENT_PROFILE.fullName);
+      setCurrentUserEmail(DEFAULT_CLIENT_PROFILE.email);
+      setProfileEmailDraft(DEFAULT_CLIENT_PROFILE.email);
       setProfileSaveMessage({ type: "idle", text: "" });
-      setCurrentUserRole(DIRECT_ACCESS_CLIENT_PROFILE.role);
-      setCurrentUserPermissions(DIRECT_ACCESS_CLIENT_PROFILE.permissions);
+      setCurrentUserRole(DEFAULT_CLIENT_PROFILE.role);
+      setCurrentUserPermissions(DEFAULT_CLIENT_PROFILE.permissions);
       setStaffPortalUnlocked(false);
       setStaffPortalUnlockedAt("");
       setStaffPortalOtp("");
@@ -12531,8 +12531,7 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
       return hQ("div", { className: "ai-qualifications-page space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto pb-8" }, [searchWorkspace, resultStage]);
     };
     if (!isAuthenticated) {
-      resetClientSession("");
-      return null;
+      return renderUnauthenticatedView();
     }
     const hP = React.createElement;
     const paymentStickyTotal = (Number(payPrincipal || 0) || 0) + (Number(payInterest || 0) || 0);

@@ -158,7 +158,7 @@ function doPost(e) {
 }
 
 var AUTH_SESSION_TTL_SECONDS = 21600;
-var LOGIN_REQUIRED = false;
+var LOGIN_REQUIRED = true;
 var MAX_LOGIN_ATTEMPTS = 5;
 var LOGIN_LOCKOUT_SECONDS = 900;
 var USER_AUTHZ_CACHE_TTL_SECONDS = 120;
@@ -295,6 +295,58 @@ function invalidateUserAuthorizationCache_(username) {
   } catch (e) {}
 }
 
+function getStaffPortalOtpCacheKey_(username) {
+  var normalizedUsername = normalizeUsername_(username);
+  return normalizedUsername ? ('staff_portal_otp_' + normalizedUsername) : '';
+}
+
+function getStaffPortalOtpThrottleCacheKey_(username) {
+  var normalizedUsername = normalizeUsername_(username);
+  return normalizedUsername ? ('staff_portal_otp_throttle_' + normalizedUsername) : '';
+}
+
+function getStaffPortalUnlockCacheKey_(username) {
+  var normalizedUsername = normalizeUsername_(username);
+  return normalizedUsername ? ('staff_portal_unlock_' + normalizedUsername) : '';
+}
+
+function getStaffPortalUnlockState_(username) {
+  var cacheKey = getStaffPortalUnlockCacheKey_(username);
+  if (!cacheKey) return { unlocked: false, unlockedAt: '' };
+  try {
+    var raw = CacheService.getScriptCache().get(cacheKey);
+    if (!raw) return { unlocked: false, unlockedAt: '' };
+    var parsed = JSON.parse(raw);
+    if (parsed && parsed.unlocked) {
+      return {
+        unlocked: true,
+        unlockedAt: String(parsed.unlockedAt || '').trim()
+      };
+    }
+  } catch (e) {}
+  return { unlocked: false, unlockedAt: '' };
+}
+
+function setStaffPortalUnlockState_(username, unlocked, unlockedAt) {
+  var cacheKey = getStaffPortalUnlockCacheKey_(username);
+  if (!cacheKey) return;
+  try {
+    if (!unlocked) {
+      CacheService.getScriptCache().remove(cacheKey);
+      return;
+    }
+    CacheService.getScriptCache().put(cacheKey, JSON.stringify({ unlocked: true, unlockedAt: unlockedAt || getThaiDate(new Date()).dateTime }), 240 * 60);
+  } catch (e) {}
+}
+
+function clearStaffPortalOtpState_(username) {
+  var cacheKey = getStaffPortalOtpCacheKey_(username);
+  if (!cacheKey) return;
+  try {
+    CacheService.getScriptCache().remove(cacheKey);
+  } catch (e) {}
+}
+
 function getUserAuthorizationSnapshot_(username) {
   var cacheKey = getUserAuthorizationCacheKey_(username);
   if (!cacheKey) return null;
@@ -327,7 +379,9 @@ function getUserAuthorizationSnapshot_(username) {
     updatedAt: String(userRecord.updatedAt || '').trim(),
     permissionsJson: String(userRecord.permissionsJson || '').trim(),
     permissions: getEffectivePermissionsForUserRecord_(userRecord),
-    permissionsMap: getEffectivePermissionMapForUserRecord_(userRecord)
+    permissionsMap: getEffectivePermissionMapForUserRecord_(userRecord),
+    staffPortalUnlocked: getStaffPortalUnlockState_(userRecord.username).unlocked,
+    staffPortalUnlockedAt: getStaffPortalUnlockState_(userRecord.username).unlockedAt
   };
 
   try {
@@ -1098,6 +1152,7 @@ var PERMISSION_CATALOG = [
   { key: 'settings.view', label: 'ดูเมนูตั้งค่าระบบ' },
   { key: 'settings.manage', label: 'แก้ไขการตั้งค่าระบบ' },
   { key: 'users.manage', label: 'จัดการผู้ใช้งาน' },
+  { key: 'staff.portal.access', label: 'เข้าส่วนงานเจ้าหน้าที่' },
   { key: 'audit.view', label: 'ดู Audit Logs' },
   { key: 'accounting.close', label: 'ปิดยอดบัญชี' },
   { key: 'backup.run', label: 'Backup ธุรกรรม' }
@@ -5125,6 +5180,8 @@ function getAppData() {
       email: String((currentUserSnapshot && currentUserSnapshot.email) || '').trim(),
       role: String((currentUserSnapshot && currentUserSnapshot.role) || sessionData.role || 'staff').trim(),
       permissions: (currentUserSnapshot && currentUserSnapshot.permissions) || [],
+      staffPortalUnlocked: !!(currentUserSnapshot && currentUserSnapshot.staffPortalUnlocked),
+      staffPortalUnlocked: !!(currentUserSnapshot && currentUserSnapshot.staffPortalUnlocked),
       permissionCatalog: getPermissionCatalog_()
     },
     settings: {
@@ -6059,6 +6116,7 @@ function verifyLoginPin(pinOrUsername, pinMaybe) {
     role: userRecord.role || 'staff',
     permissions: getEffectivePermissionsForUserRecord_(userRecord),
     permissionCatalog: getPermissionCatalog_(),
+    staffPortalUnlocked: getStaffPortalUnlockState_(userRecord.username).unlocked,
     sessionToken: sessionToken,
     backendMode: 'gas-web-app'
   };
