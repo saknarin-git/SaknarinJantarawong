@@ -3055,6 +3055,7 @@
     const reportArchiveMatchTouchRef = useRef(new Map());
     const executiveDashboardTouchRef = useRef(new Map());
     const paymentLookupResultCacheRef = useRef(new Map());
+    const paymentLookupUnauthorizedRetryRef = useRef(new Map());
     const paymentTodayResultCacheRef = useRef(new Map());
     const memberDetailResultCacheRef = useRef(new Map());
     const loanDetailResultCacheRef = useRef(new Map());
@@ -4772,6 +4773,7 @@ const [cancellingTransactionId, setCancellingTransactionId] = useState("");
         }
         const safeLoans = Array.isArray(data == null ? void 0 : data.loans) ? data.loans : [];
         if (!safeLoans.length) {
+          paymentLookupUnauthorizedRetryRef.current.delete(normalizedMemberId);
           setSearchError(`ไม่พบสัญญากู้ที่ยังมีหนี้คงค้างสำหรับรหัส "${normalizedMemberId}"`);
           return;
         }
@@ -4780,11 +4782,28 @@ const [cancellingTransactionId, setCancellingTransactionId] = useState("");
           setInterestRate(Number(data.interestRate));
         }
         const resolvedMemberName = String((data == null ? void 0 : data.memberName) || safeLoans[0] && safeLoans[0].member || "").trim();
+        paymentLookupUnauthorizedRetryRef.current.delete(normalizedMemberId);
         setNormalPaymentEditContext(null);
         startPaymentSession(normalizedMemberId, null, safeLoans);
         runBackgroundDuplicateMemberPaymentLookup(normalizedMemberId, resolvedMemberName, safeLoans);
       } catch (error) {
-        setSearchError(`ค้นหาข้อมูลรับชำระไม่สำเร็จ: ${(error == null ? void 0 : error.message) || error}`);
+        const errorMessage = String((error == null ? void 0 : error.message) || error || "");
+        if (errorMessage.indexOf("UNAUTHORIZED") !== -1 || errorMessage.indexOf("เข้าสู่ระบบใหม่") !== -1) {
+          try {
+            sessionStorage.removeItem("gasSessionToken");
+          } catch (e) {}
+          clearBackendReadCache(`paymentLookupByMember::${normalizedMemberId}`);
+          if (!paymentLookupUnauthorizedRetryRef.current.get(normalizedMemberId)) {
+            paymentLookupUnauthorizedRetryRef.current.set(normalizedMemberId, true);
+            setTimeout(() => handleFastPaymentLookup(normalizedMemberId), 120);
+            return;
+          }
+          paymentLookupUnauthorizedRetryRef.current.delete(normalizedMemberId);
+          handleUnauthorizedClientState("รีเฟรชสถานะการเข้าใช้งานแล้ว กรุณาลองค้นหาอีกครั้ง");
+          return;
+        }
+        paymentLookupUnauthorizedRetryRef.current.delete(normalizedMemberId);
+        setSearchError(`ค้นหาข้อมูลรับชำระไม่สำเร็จ: ${errorMessage}`);
       } finally {
         setIsFastPaymentLookupLoading(false);
       }
