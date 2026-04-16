@@ -2397,9 +2397,11 @@
   window.__GAS_WEB_APP_URL__ = "https://script.google.com/macros/s/AKfycbyfYwUMqroaI6ND4AdW5hfhUp_FIV1PVgEp9ggtPmWiqooB5r4tkrMvv2sIzPHQfx3H-Q/exec";
   const GAS_WEB_APP_URL_STORAGE_KEY = "gasWebAppUrl";
   const GAS_SESSION_TOKEN_STORAGE_KEY = "gasSessionToken";
+  let cachedGasWebAppUrl = "";
   const normalizeGasWebAppUrl = (value) => String(value || "").trim();
   const persistGasWebAppUrl = (url) => {
     const normalizedUrl = normalizeGasWebAppUrl(url);
+    cachedGasWebAppUrl = normalizedUrl;
     try {
       if (normalizedUrl) {
         localStorage.setItem(GAS_WEB_APP_URL_STORAGE_KEY, normalizedUrl);
@@ -2408,6 +2410,7 @@
     return normalizedUrl;
   };
   const getConfiguredGasWebAppUrl = () => {
+    if (cachedGasWebAppUrl) return cachedGasWebAppUrl;
     try {
       const searchParams = new URLSearchParams(window.location.search || "");
       const fromQuery = searchParams.get("gas_url") || searchParams.get("gasUrl") || "";
@@ -2418,7 +2421,7 @@
     if (fromWindow) return persistGasWebAppUrl(fromWindow);
 
     try {
-      return normalizeGasWebAppUrl(localStorage.getItem(GAS_WEB_APP_URL_STORAGE_KEY) || "");
+      return persistGasWebAppUrl(localStorage.getItem(GAS_WEB_APP_URL_STORAGE_KEY) || "");
     } catch (_) {
       return "";
     }
@@ -2450,6 +2453,14 @@
       setStoredGasSessionToken("");
     }
     return response;
+  };
+  const setSessionStorageValueIfChanged = (key, value) => {
+    try {
+      const normalizedValue = String(value == null ? "" : value);
+      const currentValue = String(sessionStorage.getItem(key) || "");
+      if (currentValue === normalizedValue) return;
+      sessionStorage.setItem(key, normalizedValue);
+    } catch (_) {}
   };
   window.setGasWebAppUrl = (url) => persistGasWebAppUrl(url);
   window.getGasWebAppUrl = () => getConfiguredGasWebAppUrl();
@@ -4035,14 +4046,14 @@ const [cancellingTransactionId, setCancellingTransactionId] = useState("");
     }, [shouldBuildDashboardDerivedData, dashboardCards]);
     useEffect(() => {
       try {
-        sessionStorage.setItem("isAuthenticated", isAuthenticated ? "true" : "false");
-        sessionStorage.setItem("activeTab", String(activeTab || "dashboard"));
-        sessionStorage.setItem("currentUsername", currentUsername || "");
-        sessionStorage.setItem("currentUserFullName", currentUserFullName || "");
-        sessionStorage.setItem("currentUserEmail", currentUserEmail || "");
-        sessionStorage.setItem("currentUserRole", currentUserRole || "");
-        sessionStorage.setItem("currentUserPermissions", JSON.stringify(Array.isArray(currentUserPermissions) ? currentUserPermissions : []));
-        sessionStorage.setItem("lastClosedAccountingMonth", String(lastClosedAccountingMonthKey || ""));
+        setSessionStorageValueIfChanged("isAuthenticated", isAuthenticated ? "true" : "false");
+        setSessionStorageValueIfChanged("activeTab", String(activeTab || "dashboard"));
+        setSessionStorageValueIfChanged("currentUsername", currentUsername || "");
+        setSessionStorageValueIfChanged("currentUserFullName", currentUserFullName || "");
+        setSessionStorageValueIfChanged("currentUserEmail", currentUserEmail || "");
+        setSessionStorageValueIfChanged("currentUserRole", currentUserRole || "");
+        setSessionStorageValueIfChanged("currentUserPermissions", JSON.stringify(Array.isArray(currentUserPermissions) ? currentUserPermissions : []));
+        setSessionStorageValueIfChanged("lastClosedAccountingMonth", String(lastClosedAccountingMonthKey || ""));
       } catch (e) {}
     }, [isAuthenticated, activeTab, currentUsername, currentUserFullName, currentUserEmail, currentUserRole, currentUserPermissions, lastClosedAccountingMonthKey]);
     useEffect(() => {

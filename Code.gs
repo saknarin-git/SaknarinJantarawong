@@ -5,6 +5,9 @@
 var GOOGLE_SHEETS_DB_ID = String(PropertiesService.getScriptProperties().getProperty('GOOGLE_SHEETS_DB_ID') || '').trim();
 var EXECUTION_SPREADSHEET_INSTANCE_ = null;
 var EXECUTION_SETTINGS_MAP_CACHE_ = {};
+var EXECUTION_USER_RECORDS_CACHE_ = null;
+var EXECUTION_USER_RECORDS_CACHE_SHEET_ID_ = '';
+var EXECUTION_USER_RECORDS_CACHE_LAST_ROW_ = 0;
 var RUNTIME_DB_READY_CACHE_TTL_SECONDS = 600;
 var REQUIRED_TRANSACTION_HEADERS_ = [
   'รหัสอ้างอิง', 'วัน/เดือน/ปี (พ.ศ.)', 'เลขที่สัญญา', 'รหัสสมาชิก',
@@ -289,12 +292,7 @@ function createAuthenticatedSession_(userInfo) {
     issuedAt: new Date().toISOString()
   };
 
-  CacheService.getUserCache().put('auth_session_current', JSON.stringify(sessionData), AUTH_SESSION_TTL_SECONDS);
-
-  var cacheKey = getAuthSessionCacheKey_();
-  if (cacheKey) {
-    CacheService.getScriptCache().put(cacheKey, JSON.stringify(sessionData), AUTH_SESSION_TTL_SECONDS);
-  }
+  putAuthSessionToCaches_(sessionData);
 
   if (ACTIVE_API_REQUEST_CONTEXT_) {
     ACTIVE_API_REQUEST_CONTEXT_.sessionData = sessionData;
@@ -425,14 +423,7 @@ function touchAuthenticatedSession_(sessionData) {
   };
 
   try {
-    CacheService.getUserCache().put('auth_session_current', JSON.stringify(refreshedSession), AUTH_SESSION_TTL_SECONDS);
-  } catch (e) {}
-
-  try {
-    var cacheKey = getAuthSessionCacheKey_();
-    if (cacheKey) {
-      CacheService.getScriptCache().put(cacheKey, JSON.stringify(refreshedSession), AUTH_SESSION_TTL_SECONDS);
-    }
+    putAuthSessionToCaches_(refreshedSession);
   } catch (e) {}
 
   try {
@@ -730,12 +721,30 @@ function buildUserRecordFromSheetRow_(sheet, rowNumber, rowValues) {
 
 function getAllUserRecords_(usersSheet) {
   if (!usersSheet || usersSheet.getLastRow() <= 1) return [];
-  var values = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, USERS_SHEET_HEADERS.length).getValues();
+  var sheetId = String(usersSheet.getSheetId());
+  var lastRow = Number(usersSheet.getLastRow()) || 0;
+  if (
+    EXECUTION_USER_RECORDS_CACHE_
+    && EXECUTION_USER_RECORDS_CACHE_SHEET_ID_ === sheetId
+    && EXECUTION_USER_RECORDS_CACHE_LAST_ROW_ === lastRow
+  ) {
+    return EXECUTION_USER_RECORDS_CACHE_;
+  }
+  var values = usersSheet.getRange(2, 1, lastRow - 1, USERS_SHEET_HEADERS.length).getValues();
   var records = [];
   for (var i = 0; i < values.length; i++) {
     records.push(buildUserRecordFromSheetRow_(usersSheet, i + 2, values[i]));
   }
+  EXECUTION_USER_RECORDS_CACHE_ = records;
+  EXECUTION_USER_RECORDS_CACHE_SHEET_ID_ = sheetId;
+  EXECUTION_USER_RECORDS_CACHE_LAST_ROW_ = lastRow;
   return records;
+}
+
+function invalidateUserRecordsExecutionCache_(usersSheet) {
+  EXECUTION_USER_RECORDS_CACHE_ = null;
+  EXECUTION_USER_RECORDS_CACHE_SHEET_ID_ = usersSheet ? String(usersSheet.getSheetId()) : '';
+  EXECUTION_USER_RECORDS_CACHE_LAST_ROW_ = 0;
 }
 
 function normalizeUsername_(value) {
@@ -895,12 +904,36 @@ function updateUserCellsByRecord_(usersSheet, userRecord, patch) {
   };
 
   var keys = Object.keys(patch);
+  if (!keys.length) return;
+
+  var rowRange = usersSheet.getRange(userRecord.rowNumber, 1, 1, USERS_SHEET_HEADERS.length);
+  var rowValues = rowRange.getValues();
+  var nextRow = rowValues && rowValues[0] ? rowValues[0] : [];
+  var hasChanges = false;
+
   for (var i = 0; i < keys.length; i++) {
     var key = keys[i];
     var col = fieldToColumn[key];
     if (!col) continue;
-    usersSheet.getRange(userRecord.rowNumber, col).setValue(patch[key]);
+    nextRow[col - 1] = patch[key];
     userRecord[key] = patch[key];
+    hasChanges = true;
+  }
+
+  if (!hasChanges) return;
+
+  rowRange.setValues([nextRow]);
+  invalidateUserRecordsExecutionCache_(usersSheet);
+}
+
+function putAuthSessionToCaches_(sessionData) {
+  if (!sessionData || !sessionData.username) return;
+  var serialized = JSON.stringify(sessionData);
+  CacheService.getUserCache().put('auth_session_current', serialized, AUTH_SESSION_TTL_SECONDS);
+
+  var cacheKey = getAuthSessionCacheKey_();
+  if (cacheKey) {
+    CacheService.getScriptCache().put(cacheKey, serialized, AUTH_SESSION_TTL_SECONDS);
   }
 }
 
