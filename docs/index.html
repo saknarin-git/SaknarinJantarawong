@@ -2770,7 +2770,37 @@
       fullName: "ผู้ดูแลระบบ",
       email: "",
       role: "admin",
-      permissions: []
+      permissions: [
+        "dashboard.executive",
+        "payments.create",
+        "payments.edit",
+        "payments.reverse",
+        "payment_records.view",
+        "members.manage",
+        "members.view",
+        "loans.manage",
+        "loans.view",
+        "reports.view",
+        "reports.archive",
+        "reports.export",
+        "reports.reconcile",
+        "settings.manage",
+        "settings.view",
+        "users.manage",
+        "audit.view",
+        "accounting.close",
+        "backup.run",
+        "approvals.request",
+        "approvals.view",
+        "approvals.manage",
+        "notes.view",
+        "notes.manage",
+        "attachments.view",
+        "attachments.manage",
+        "notifications.manage",
+        "notifications.view_history",
+        "staff.portal.access"
+      ]
     };
     const [isAuthenticated, setIsAuthenticated] = useState(true);
     const [activeTab, setActiveTab] = useState(() => {
@@ -2782,19 +2812,12 @@
     const [isLoading, setIsLoading] = useState(false);
     const [isDataLoaded, setIsDataLoaded] = useState(false);
     const [initialLoadError, setInitialLoadError] = useState(null);
-    const [currentUsername, setCurrentUsername] = useState(() => sessionStorage.getItem("currentUsername") || DIRECT_ACCESS_CLIENT_PROFILE.username);
-    const [currentUserFullName, setCurrentUserFullName] = useState(() => sessionStorage.getItem("currentUserFullName") || DIRECT_ACCESS_CLIENT_PROFILE.fullName);
-    const [currentUserEmail, setCurrentUserEmail] = useState(() => sessionStorage.getItem("currentUserEmail") || DIRECT_ACCESS_CLIENT_PROFILE.email);
-    const [currentUserRole, setCurrentUserRole] = useState(() => sessionStorage.getItem("currentUserRole") || DIRECT_ACCESS_CLIENT_PROFILE.role);
-    const [currentUserPermissions, setCurrentUserPermissions] = useState(() => {
-      try {
-        const storedPermissions = JSON.parse(sessionStorage.getItem("currentUserPermissions") || "[]");
-        return Array.isArray(storedPermissions) ? storedPermissions : DIRECT_ACCESS_CLIENT_PROFILE.permissions;
-      } catch (e) {
-        return DIRECT_ACCESS_CLIENT_PROFILE.permissions;
-      }
-    });
-    const [staffPortalUnlocked, setStaffPortalUnlocked] = useState(() => sessionStorage.getItem("staffPortalUnlocked") === "true");
+    const [currentUsername, setCurrentUsername] = useState(() => DIRECT_ACCESS_CLIENT_PROFILE.username);
+    const [currentUserFullName, setCurrentUserFullName] = useState(() => DIRECT_ACCESS_CLIENT_PROFILE.fullName);
+    const [currentUserEmail, setCurrentUserEmail] = useState(() => DIRECT_ACCESS_CLIENT_PROFILE.email);
+    const [currentUserRole, setCurrentUserRole] = useState(() => DIRECT_ACCESS_CLIENT_PROFILE.role);
+    const [currentUserPermissions, setCurrentUserPermissions] = useState(() => DIRECT_ACCESS_CLIENT_PROFILE.permissions);
+    const [staffPortalUnlocked, setStaffPortalUnlocked] = useState(true);
     const [staffPortalUnlockedAt, setStaffPortalUnlockedAt] = useState(() => sessionStorage.getItem("staffPortalUnlockedAt") || "");
     const [profileEmailDraft, setProfileEmailDraft] = useState(() => sessionStorage.getItem("currentUserEmail") || "");
     const [isSavingProfile, setIsSavingProfile] = useState(false);
