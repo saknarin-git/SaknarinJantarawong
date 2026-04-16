@@ -6657,7 +6657,7 @@ const getQuickOverviewToneClass = (tone) => {
             setRegisterForm({ prefix: "", firstName: "", lastName: "", username: "", email: "", pin: "", confirmPin: "" });
             setEmailVerifyForm({ identifier: String((result == null ? void 0 : result.identifier) || username || "").trim(), otp: "" });
             setAuthView("verifyEmail");
-            setAuthNotice({ type: "success", message: (result == null ? void 0 : result.message) || "สมัครใช้งานสำเร็จ กรุณายืนยันอีเมลด้วย OTP" });
+            setAuthNotice({ type: "success", message: (result == null ? void 0 : result.message) || "สมัครใช้งานสำเร็จ กรุณาเปิดอีเมลเพื่อกดยืนยันบัญชี" });
           } else {
             setAuthNotice({ type: "error", message: (result == null ? void 0 : result.message) || "สมัครใช้งานไม่สำเร็จ" });
           }
@@ -6671,34 +6671,32 @@ const getQuickOverviewToneClass = (tone) => {
         setIsRegistering(false);
       }
     };
-    const handleVerifyEmailOtpSubmit = (e) => {
+      const handleVerifyEmailOtpSubmit = (e) => {
       e.preventDefault();
       if (isVerifyingEmail) return;
       const identifier = String(emailVerifyForm.identifier || "").trim();
-      const otp = String(emailVerifyForm.otp || "").trim();
-      if (!identifier || !otp) {
-        setAuthNotice({ type: "error", message: "กรุณากรอกชื่อผู้ใช้/อีเมล และ OTP ให้ครบถ้วน" });
+      if (!identifier) {
+        setAuthNotice({ type: "error", message: "กรุณากรอกชื่อผู้ใช้หรืออีเมลเพื่อส่งลิงก์ยืนยัน" });
         return;
       }
       setIsVerifyingEmail(true);
-      setAuthNotice({ type: "loading", message: "กำลังยืนยันอีเมล..." });
+      setAuthNotice({ type: "loading", message: "กำลังส่งลิงก์ยืนยันอีเมล..." });
       if (typeof google !== "undefined" && google.script && google.script.run) {
         google.script.run.withSuccessHandler((response) => {
           const result = typeof response === "string" ? { status: response } : response || {};
           if (result.status === "Success") {
             setEmailVerifyForm({ identifier: "", otp: "" });
-            setAuthView("login");
-            setAuthNotice({ type: "success", message: (result == null ? void 0 : result.message) || "ยืนยันอีเมลเรียบร้อยแล้ว กรุณารอผู้ดูแลอนุมัติบัญชี" });
+            setAuthNotice({ type: "success", message: (result == null ? void 0 : result.message) || "ส่งลิงก์ยืนยันอีเมลแล้ว กรุณาเปิดอีเมลเพื่อยืนยันบัญชี" });
           } else {
-            setAuthNotice({ type: "error", message: (result == null ? void 0 : result.message) || "ยืนยันอีเมลไม่สำเร็จ" });
+            setAuthNotice({ type: "error", message: (result == null ? void 0 : result.message) || "ส่งลิงก์ยืนยันอีเมลไม่สำเร็จ" });
           }
           setIsVerifyingEmail(false);
         }).withFailureHandler((error) => {
-          setAuthNotice({ type: "error", message: "ยืนยันอีเมลไม่สำเร็จ: " + (((error == null ? void 0 : error.message) || error || "ไม่ทราบสาเหตุ")) });
+          setAuthNotice({ type: "error", message: "ส่งลิงก์ยืนยันอีเมลไม่สำเร็จ: " + (((error == null ? void 0 : error.message) || error || "ไม่ทราบสาเหตุ")) });
           setIsVerifyingEmail(false);
-        }).verifyEmailWithOtp(JSON.stringify({ identifier, otp }));
+        }).requestEmailVerificationOtp(identifier);
       } else {
-        setAuthNotice({ type: "error", message: "ไม่สามารถเชื่อมต่อระบบเพื่อยืนยันอีเมลได้" });
+        setAuthNotice({ type: "error", message: "ไม่สามารถเชื่อมต่อระบบเพื่อส่งลิงก์ยืนยันอีเมลได้" });
         setIsVerifyingEmail(false);
       }
     };
@@ -6706,26 +6704,26 @@ const getQuickOverviewToneClass = (tone) => {
       if (isResendingEmailOtp) return;
       const identifier = String(emailVerifyForm.identifier || "").trim();
       if (!identifier) {
-        setAuthNotice({ type: "error", message: "กรุณากรอกชื่อผู้ใช้หรืออีเมลก่อนขอ OTP ใหม่" });
+        setAuthNotice({ type: "error", message: "กรุณากรอกชื่อผู้ใช้หรืออีเมลก่อนส่งลิงก์ยืนยัน" });
         return;
       }
       setIsResendingEmailOtp(true);
-      setAuthNotice({ type: "loading", message: "กำลังส่ง OTP ยืนยันอีเมลใหม่..." });
+      setAuthNotice({ type: "loading", message: "กำลังส่งลิงก์ยืนยันอีเมลใหม่..." });
       if (typeof google !== "undefined" && google.script && google.script.run) {
         google.script.run.withSuccessHandler((response) => {
           const result = typeof response === "string" ? { status: response } : response || {};
           if (result.status === "Success") {
-            setAuthNotice({ type: "success", message: (result == null ? void 0 : result.message) || "ส่ง OTP ยืนยันอีเมลใหม่แล้ว" });
+            setAuthNotice({ type: "success", message: (result == null ? void 0 : result.message) || "ส่งลิงก์ยืนยันอีเมลใหม่แล้ว" });
           } else {
-            setAuthNotice({ type: "error", message: (result == null ? void 0 : result.message) || "ส่ง OTP ยืนยันอีเมลใหม่ไม่สำเร็จ" });
+            setAuthNotice({ type: "error", message: (result == null ? void 0 : result.message) || "ส่งลิงก์ยืนยันอีเมลใหม่ไม่สำเร็จ" });
           }
           setIsResendingEmailOtp(false);
         }).withFailureHandler((error) => {
-          setAuthNotice({ type: "error", message: "ส่ง OTP ยืนยันอีเมลใหม่ไม่สำเร็จ: " + (((error == null ? void 0 : error.message) || error || "ไม่ทราบสาเหตุ")) });
+          setAuthNotice({ type: "error", message: "ส่งลิงก์ยืนยันอีเมลใหม่ไม่สำเร็จ: " + (((error == null ? void 0 : error.message) || error || "ไม่ทราบสาเหตุ")) });
           setIsResendingEmailOtp(false);
         }).requestEmailVerificationOtp(identifier);
       } else {
-        setAuthNotice({ type: "error", message: "ไม่สามารถเชื่อมต่อระบบเพื่อส่ง OTP ยืนยันอีเมลใหม่ได้" });
+        setAuthNotice({ type: "error", message: "ไม่สามารถเชื่อมต่อระบบเพื่อส่งลิงก์ยืนยันอีเมลใหม่ได้" });
         setIsResendingEmailOtp(false);
       }
     };
@@ -6749,11 +6747,11 @@ const getQuickOverviewToneClass = (tone) => {
           if (result.status === "Success") {
             setAuthNotice({ type: "success", message: (result == null ? void 0 : result.message) || "ส่งรหัส OTP แล้ว" });
           } else {
-            setAuthNotice({ type: "error", message: (result == null ? void 0 : result.message) || "ส่ง OTP ไม่สำเร็จ" });
+            setAuthNotice({ type: "error", message: (result == null ? void 0 : result.message) || "ส่งลิงก์ยืนยันอีเมลไม่สำเร็จ" });
           }
           setIsRequestingReset(false);
         }).withFailureHandler((error) => {
-          setAuthNotice({ type: "error", message: "ส่ง OTP ไม่สำเร็จ: " + (((error == null ? void 0 : error.message) || error || "ไม่ทราบสาเหตุ")) });
+          setAuthNotice({ type: "error", message: "ส่งลิงก์ยืนยันอีเมลไม่สำเร็จ: " + (((error == null ? void 0 : error.message) || error || "ไม่ทราบสาเหตุ")) });
           setIsRequestingReset(false);
         }).requestPinResetOtp(identifier);
       } else {
@@ -12076,18 +12074,14 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
           /* @__PURE__ */ React.createElement("label", { key: "label", className: "mb-2 block text-sm font-bold text-slate-700" }, "ชื่อผู้ใช้ หรือ อีเมล"),
           /* @__PURE__ */ React.createElement("input", { key: "input", type: "text", value: emailVerifyForm.identifier, onChange: (e) => updateEmailVerifyForm("identifier", e.target.value), placeholder: "กรอกชื่อผู้ใช้หรืออีเมลที่ใช้สมัคร", autoCapitalize: "none", autoCorrect: "off", spellCheck: false, required: true, className: "w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100" })
         ]),
-        /* @__PURE__ */ React.createElement("div", { key: "otp" }, [
-          /* @__PURE__ */ React.createElement("label", { key: "label", className: "mb-2 block text-sm font-bold text-slate-700" }, "OTP ยืนยันอีเมล"),
-          /* @__PURE__ */ React.createElement("input", { key: "input", type: "text", value: emailVerifyForm.otp, onChange: (e) => updateEmailVerifyForm("otp", e.target.value), placeholder: "กรอกรหัส OTP 6 หลัก", inputMode: "numeric", maxLength: 6, required: true, className: "w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100" })
-        ]),
         /* @__PURE__ */ React.createElement("div", { key: "actions", className: "grid grid-cols-1 gap-3 sm:grid-cols-2" }, [
           /* @__PURE__ */ React.createElement("button", { key: "verify", type: "submit", disabled: isVerifyingEmail || !isOnline, className: "inline-flex w-full items-center justify-center rounded-2xl bg-blue-600 px-5 py-3.5 text-sm font-black text-white shadow-xl shadow-blue-600/20 transition hover:-translate-y-0.5 hover:bg-blue-700 disabled:opacity-60" }, [
             isVerifyingEmail ? /* @__PURE__ */ React.createElement(Loader2, { key: "spin", className: "mr-2 h-5 w-5 animate-spin" }) : /* @__PURE__ */ React.createElement(CheckCircle2, { key: "icon", className: "mr-2 h-5 w-5" }),
-            "ยืนยันอีเมล"
+            "ส่งลิงก์ยืนยันอีเมล"
           ]),
           /* @__PURE__ */ React.createElement("button", { key: "resend", type: "button", onClick: handleResendEmailOtp, disabled: isResendingEmailOtp || !isOnline, className: "inline-flex w-full items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-5 py-3.5 text-sm font-black text-blue-700 transition hover:bg-blue-100 disabled:opacity-60" }, [
             isResendingEmailOtp ? /* @__PURE__ */ React.createElement(Loader2, { key: "spin", className: "mr-2 h-5 w-5 animate-spin" }) : /* @__PURE__ */ React.createElement(Sparkles, { key: "icon", className: "mr-2 h-5 w-5" }),
-            "ส่ง OTP ใหม่"
+            "ส่งลิงก์ใหม่"
           ])
         ]),
         /* @__PURE__ */ React.createElement("button", { key: "back", type: "button", onClick: () => switchAuthView("login"), className: "w-full rounded-2xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50" }, "กลับหน้าเข้าสู่ระบบ")
@@ -12150,7 +12144,7 @@ const renderPaymentManagementGroup = (group, groupIndex) => /* @__PURE__ */ Reac
           /* @__PURE__ */ React.createElement("div", { key: "body", className: "auth-ai-form-panel mt-6 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6" }, [
             /* @__PURE__ */ React.createElement("div", { key: "titleWrap", className: "mb-5" }, [
               /* @__PURE__ */ React.createElement("h3", { key: "title", className: "text-xl font-black tracking-tight text-slate-900" }, authView === "login" ? "เข้าสู่ระบบ" : authView === "register" ? "สมัครใช้งาน" : authView === "verifyEmail" ? "ยืนยันอีเมล" : authView === "adminRecovery" ? "กู้บัญชีแอดมิน" : "ลืม PIN"),
-              /* @__PURE__ */ React.createElement("p", { key: "desc", className: "mt-1 text-sm leading-6 text-slate-500" }, authView === "login" ? "กรอก PIN 6 หลักเพื่อเข้าสู่ระบบ ระบบจะตรวจให้อัตโนมัติเมื่อกรอกครบ" : authView === "register" ? "สร้างบัญชีใหม่ ตั้ง PIN และรอ OTP ยืนยันอีเมล" : authView === "verifyEmail" ? "กรอก OTP จากอีเมลเพื่อเปิดสิทธิ์รออนุมัติบัญชี" : authView === "adminRecovery" ? "กรอก Recovery Key เพื่อตั้ง PIN ใหม่และปลดล็อกบัญชี admin" : "ขอ OTP ทางอีเมล แล้วตั้ง PIN ใหม่ได้จากหน้านี้")
+              /* @__PURE__ */ React.createElement("p", { key: "desc", className: "mt-1 text-sm leading-6 text-slate-500" }, authView === "login" ? "กรอก PIN 6 หลักเพื่อเข้าสู่ระบบ ระบบจะตรวจให้อัตโนมัติเมื่อกรอกครบ" : authView === "register" ? "สร้างบัญชีใหม่ ตั้ง PIN และรออีเมลยืนยัน" : authView === "verifyEmail" ? "กรอกชื่อผู้ใช้หรืออีเมล แล้วระบบจะส่งลิงก์ยืนยันไปทางอีเมล" : authView === "adminRecovery" ? "กรอก Recovery Key เพื่อตั้ง PIN ใหม่และปลดล็อกบัญชี admin" : "ขอรหัสใหม่ทางอีเมล แล้วตั้ง PIN ใหม่ได้จากหน้านี้")
             ]),
             offlineAuthBox,
             authNoticeBox,

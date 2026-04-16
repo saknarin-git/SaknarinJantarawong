@@ -25,11 +25,55 @@ function getDatabaseSpreadsheet_() {
   return EXECUTION_SPREADSHEET_INSTANCE_;
 }
 
-function doGet() {
+function doGet(e) {
+  var query = (e && e.parameter) ? e.parameter : {};
+  var action = String((query && query.action) || '').trim();
+  var token = String((query && query.token) || query.verifyToken || '').trim();
+  var identifier = String((query && query.identifier) || '').trim();
+
+  if (action === 'verifyEmail' && token) {
+    var result = verifyEmailByLinkToken_(token, identifier);
+    var message = String((result && result.message) || '');
+    var title = (result && result.status === 'Success') ? 'ยืนยันอีเมลสำเร็จ' : 'ยืนยันอีเมลไม่สำเร็จ';
+    return HtmlService.createHtmlOutput([
+      '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">',
+      '<title>', title, '</title>',
+      '<style>body{font-family:Arial,sans-serif;background:#f8fafc;margin:0;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px;color:#0f172a}.card{max-width:640px;width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:24px;box-shadow:0 24px 80px -32px rgba(15,23,42,.35);padding:32px}h1{margin:0 0 12px;font-size:28px}p{line-height:1.8;margin:0 0 18px}.ok{color:#047857}.err{color:#b91c1c}.btn{display:inline-block;background:#0f766e;color:#fff;text-decoration:none;padding:12px 18px;border-radius:14px;font-weight:700}</style>',
+      '</head><body><div class="card"><h1 class="', (result && result.status === 'Success') ? 'ok' : 'err', '">', title, '</h1><p>', message, '</p><a class="btn" href="', ScriptApp.getService().getUrl(), '">กลับไปหน้าเข้าสู่ระบบ</a></div></body></html>'
+    ].join(''))
+      .setTitle(title)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
+
   return HtmlService.createHtmlOutputFromFile('Index')
     .setTitle('ระบบจัดการเงินกู้ บ้านพิตำ')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+function getWebAppUrl_() {
+  try {
+    return String(ScriptApp.getService().getUrl() || '').trim();
+  } catch (e) {
+    return '';
+  }
+}
+
+function generateEmailVerificationToken_() {
+  return Utilities.getUuid() + Utilities.getUuid().replace(/-/g, '');
+}
+
+function buildEmailVerificationLink_(token, identifier) {
+  var baseUrl = getWebAppUrl_();
+  if (!baseUrl) return '';
+  var params = [
+    'action=verifyEmail',
+    'token=' + encodeURIComponent(String(token || '').trim())
+  ];
+  var safeIdentifier = String(identifier || '').trim();
+  if (safeIdentifier) params.push('identifier=' + encodeURIComponent(safeIdentifier));
+  return baseUrl + '?' + params.join('&');
 }
 
 function parseApiRequestPayload_(e) {
@@ -6167,10 +6211,14 @@ function registerUser(registerPayloadStr) {
     }
 
     var pinUniqueKey = ensurePinUniqueAcrossUsers_(usersSheet, pin, '');
-    var emailVerifyOtpCode = generateSixDigitOtp_();
+    var emailVerificationToken = generateEmailVerificationToken_();
 
     var nowText = getThaiDate(new Date()).dateTime;
     var emailVerifyExpireAt = getThaiDate(addMinutesToDate_(new Date(), EMAIL_VERIFICATION_OTP_TTL_MINUTES)).dateTime;
+    var emailVerificationLink = buildEmailVerificationLink_(emailVerificationToken, username);
+    if (!emailVerificationLink) {
+      return { status: 'Error', message: 'ไม่สามารถสร้างลิงก์ยืนยันอีเมลได้' };
+    }
     appendRowsSafely_(usersSheet, [[
       Utilities.getUuid(),
       username,
@@ -6194,19 +6242,21 @@ function registerUser(registerPayloadStr) {
       createPasswordHashRecord_(pin),
       pinUniqueKey,
       nowText,
-      createPasswordHashRecord_(emailVerifyOtpCode),
+      createPasswordHashRecord_(emailVerificationToken),
       emailVerifyExpireAt,
       nowText
     ]], 'เพิ่มผู้ใช้ใหม่');
 
     MailApp.sendEmail({
       to: email,
-      subject: 'OTP ยืนยันอีเมล - ระบบจัดการเงินกู้ บ้านพิตำ',
+      subject: 'ลิงก์ยืนยันอีเมล - ระบบจัดการเงินกู้ บ้านพิตำ',
       body: [
         'เรียน ' + fullName,
         '',
-        'รหัส OTP สำหรับยืนยันอีเมลคือ: ' + emailVerifyOtpCode,
-        'รหัสนี้มีอายุ ' + EMAIL_VERIFICATION_OTP_TTL_MINUTES + ' นาที',
+        'กรุณาคลิกลิงก์ด้านล่างเพื่อยืนยันอีเมล:',
+        emailVerificationLink,
+        '',
+        'ลิงก์นี้มีอายุ ' + EMAIL_VERIFICATION_OTP_TTL_MINUTES + ' นาที',
         '',
         'เมื่อยืนยันอีเมลแล้ว บัญชีจะพร้อมรอผู้ดูแลอนุมัติการใช้งาน',
         '',
@@ -6218,7 +6268,7 @@ function registerUser(registerPayloadStr) {
     logSystemActionFast(ss, 'สมัครใช้งาน', 'ผู้ใช้งานใหม่: ' + username + ' | Email: ' + email, username);
     return {
       status: 'Success',
-      message: 'สมัครใช้งานสำเร็จ กรุณากรอก OTP ที่ส่งไปยังอีเมลเพื่อยืนยันอีเมลก่อนรอผู้ดูแลอนุมัติ',
+      message: 'สมัครใช้งานสำเร็จ กรุณาตรวจสอบอีเมลและคลิกลิงก์ยืนยันบัญชี',
       requiresEmailVerification: true,
       identifier: username
     };
@@ -6245,12 +6295,16 @@ function requestEmailVerificationOtp(identifier) {
     if (!userRecord || !userRecord.email) return { status: 'Error', message: 'ไม่พบบัญชีผู้ใช้งาน' };
     if (String(userRecord.emailVerifiedAt || '').trim()) return { status: 'Success', message: 'บัญชีนี้ยืนยันอีเมลแล้ว' };
 
-    var otpCode = generateSixDigitOtp_();
+    var verificationToken = generateEmailVerificationToken_();
     var nowText = getThaiDate(new Date()).dateTime;
     var expireAtText = getThaiDate(addMinutesToDate_(new Date(), EMAIL_VERIFICATION_OTP_TTL_MINUTES)).dateTime;
+    var verificationLink = buildEmailVerificationLink_(verificationToken, normalizedIdentifier);
+    if (!verificationLink) {
+      return { status: 'Error', message: 'ไม่สามารถสร้างลิงก์ยืนยันอีเมลได้' };
+    }
 
     updateUserCellsByRecord_(usersSheet, userRecord, {
-      emailVerifyOtpHash: createPasswordHashRecord_(otpCode),
+      emailVerifyOtpHash: createPasswordHashRecord_(verificationToken),
       emailVerifyOtpExpireAt: expireAtText,
       emailVerifyOtpRequestedAt: nowText,
       updatedAt: nowText
@@ -6258,27 +6312,33 @@ function requestEmailVerificationOtp(identifier) {
 
     MailApp.sendEmail({
       to: userRecord.email,
-      subject: 'OTP ยืนยันอีเมล - ระบบจัดการเงินกู้ บ้านพิตำ',
+      subject: 'ลิงก์ยืนยันอีเมล - ระบบจัดการเงินกู้ บ้านพิตำ',
       body: [
         'เรียน ' + (userRecord.fullName || userRecord.username || 'ผู้ใช้งาน'),
         '',
-        'รหัส OTP สำหรับยืนยันอีเมลคือ: ' + otpCode,
-        'รหัสนี้มีอายุ ' + EMAIL_VERIFICATION_OTP_TTL_MINUTES + ' นาที',
+        'กรุณาคลิกลิงก์ด้านล่างเพื่อยืนยันอีเมล:',
+        verificationLink,
+        '',
+        'ลิงก์นี้มีอายุ ' + EMAIL_VERIFICATION_OTP_TTL_MINUTES + ' นาที',
         '',
         'ระบบจัดการเงินกู้ บ้านพิตำ'
       ].join('\n')
     });
 
     clearAppCache_();
-    return { status: 'Success', message: 'ส่ง OTP ยืนยันอีเมลแล้ว' };
+    return { status: 'Success', message: 'ส่งลิงก์ยืนยันอีเมลแล้ว กรุณาตรวจสอบอีเมลและคลิกลิงก์เพื่อยืนยันบัญชี' };
   } catch (e) {
-    return { status: 'Error', message: 'ส่ง OTP ยืนยันอีเมลไม่สำเร็จ: ' + e.toString() };
+    return { status: 'Error', message: 'ส่งลิงก์ยืนยันอีเมลไม่สำเร็จ: ' + e.toString() };
   } finally {
     if (lockAcquired) lock.releaseLock();
   }
 }
 
 function verifyEmailWithOtp(payloadStr) {
+  return verifyEmailByLinkPayload_(payloadStr);
+}
+
+function verifyEmailByLinkPayload_(payloadStr) {
   var lock = LockService.getScriptLock();
   var lockAcquired = false;
   try {
@@ -6287,9 +6347,9 @@ function verifyEmailWithOtp(payloadStr) {
 
     var payload = typeof payloadStr === 'string' ? JSON.parse(payloadStr) : (payloadStr || {});
     var identifier = String(payload.identifier || '').trim();
-    var otp = String(payload.otp || '').trim();
+    var token = String(payload.token || payload.otp || payload.linkToken || '').trim();
     if (!identifier) return { status: 'Error', message: 'กรุณากรอกชื่อผู้ใช้หรืออีเมล' };
-    if (!otp) return { status: 'Error', message: 'กรุณากรอก OTP' };
+    if (!token) return { status: 'Error', message: 'กรุณาเปิดลิงก์จากอีเมลยืนยัน' };
 
     var ss = getDatabaseSpreadsheet_();
     var usersSheet = ensureUsersSheet_(ss);
@@ -6300,11 +6360,11 @@ function verifyEmailWithOtp(payloadStr) {
 
     var expireParts = parseThaiDateParts_(userRecord.emailVerifyOtpExpireAt);
     if (!expireParts || !expireParts.nativeDate || expireParts.nativeDate.getTime() < new Date().getTime()) {
-      return { status: 'Error', message: 'OTP หมดอายุแล้ว กรุณาขอ OTP ใหม่' };
+      return { status: 'Error', message: 'ลิงก์ยืนยันหมดอายุแล้ว กรุณาขอส่งลิงก์ใหม่' };
     }
 
-    if (!verifyPasswordAgainstStoredHash_(otp, userRecord.emailVerifyOtpHash)) {
-      return { status: 'Error', message: 'OTP ไม่ถูกต้อง' };
+    if (!verifyPasswordAgainstStoredHash_(token, userRecord.emailVerifyOtpHash)) {
+      return { status: 'Error', message: 'ลิงก์ยืนยันไม่ถูกต้อง' };
     }
 
     var nowText = getThaiDate(new Date()).dateTime;
@@ -6320,6 +6380,60 @@ function verifyEmailWithOtp(payloadStr) {
     return { status: 'Success', message: 'ยืนยันอีเมลสำเร็จ กรุณารอผู้ดูแลอนุมัติบัญชี' };
   } catch (e) {
     return { status: 'Error', message: e.toString() };
+  } finally {
+    if (lockAcquired) lock.releaseLock();
+  }
+}
+
+function verifyEmailByLinkToken_(token, identifier) {
+  var lock = LockService.getScriptLock();
+  var lockAcquired = false;
+  try {
+    lock.waitLock(30000);
+    lockAcquired = true;
+
+    var normalizedToken = String(token || '').trim();
+    if (!normalizedToken) return { status: 'Error', message: 'ไม่พบโทเค็นยืนยันอีเมล' };
+
+    var ss = getDatabaseSpreadsheet_();
+    var usersSheet = ensureUsersSheet_(ss);
+    var users = getAllUserRecords_(usersSheet);
+    var matchedUser = null;
+    for (var i = 0; i < users.length; i++) {
+      var user = users[i];
+      if (!user || !user.emailVerifyOtpHash || !user.emailVerifyOtpExpireAt) continue;
+      var expireParts = parseThaiDateParts_(user.emailVerifyOtpExpireAt);
+      if (!expireParts || !expireParts.nativeDate || expireParts.nativeDate.getTime() < new Date().getTime()) continue;
+      if (!verifyPasswordAgainstStoredHash_(normalizedToken, user.emailVerifyOtpHash)) continue;
+      if (identifier) {
+        var matchedIdentifier = findUserByIdentifierInternal_(usersSheet, identifier);
+        if (!matchedIdentifier || String(matchedIdentifier.userId || '').trim() !== String(user.userId || '').trim()) continue;
+      }
+      matchedUser = user;
+      break;
+    }
+
+    if (!matchedUser) {
+      return { status: 'Error', message: 'ลิงก์ยืนยันไม่ถูกต้องหรือหมดอายุแล้ว' };
+    }
+
+    if (String(matchedUser.emailVerifiedAt || '').trim()) {
+      return { status: 'Success', message: 'บัญชีนี้ยืนยันอีเมลแล้ว' };
+    }
+
+    var nowText = getThaiDate(new Date()).dateTime;
+    updateUserCellsByRecord_(usersSheet, matchedUser, {
+      emailVerifiedAt: nowText,
+      emailVerifyOtpHash: '',
+      emailVerifyOtpExpireAt: '',
+      emailVerifyOtpRequestedAt: '',
+      updatedAt: nowText
+    });
+    clearAppCache_();
+    logSystemActionFast(ss, 'ยืนยันอีเมลผู้ใช้ด้วยลิงก์', 'ผู้ใช้งาน: ' + (matchedUser.username || '-'), matchedUser.username || 'system');
+    return { status: 'Success', message: 'ยืนยันอีเมลสำเร็จ กรุณากลับไปเข้าสู่ระบบ' };
+  } catch (e) {
+    return { status: 'Error', message: e && e.message ? e.message : String(e || 'ไม่สามารถยืนยันอีเมลได้') };
   } finally {
     if (lockAcquired) lock.releaseLock();
   }
