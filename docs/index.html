@@ -2394,7 +2394,7 @@
 <script>
 (() => {
   const __bootStartedAt = Date.now();
-  window.__GAS_WEB_APP_URL__ = "https://script.google.com/macros/s/AKfycbyfYwUMqroaI6ND4AdW5hfhUp_FIV1PVgEp9ggtPmWiqooB5r4tkrMvv2sIzPHQfx3H-Q/exec";
+  window.__GAS_WEB_APP_URL__ = "https://script.google.com/macros/s/AKfycbwZ8ynEfRH6cTmiVg3n_IFheSxJ2KtwCLx5D04VdM_NeCc_ziBQiZT6ZNca1Q8okdXJOA/exec";
   const GAS_WEB_APP_URL_STORAGE_KEY = "gasWebAppUrl";
   const GAS_SESSION_TOKEN_STORAGE_KEY = "gasSessionToken";
   let cachedGasWebAppUrl = "";
@@ -2466,7 +2466,7 @@
   window.setGasWebAppUrl = (url) => persistGasWebAppUrl(url);
   window.getGasWebAppUrl = () => getConfiguredGasWebAppUrl();
 
-  const invokeRemoteBackendMethod = async (methodName, args = []) => {
+  const invokeRemoteBackendMethod = async (methodName, args = [], options = {}) => {
     const endpoint = getConfiguredGasWebAppUrl();
     if (!endpoint) {
       throw new Error("ยังไม่ได้ตั้งค่า URL ของ GAS Web App สำหรับหน้า GitHub Pages");
@@ -2490,6 +2490,11 @@
     const looksLikeHtml = /^<!doctype html/i.test(normalizedRawText) || /^<html/i.test(normalizedRawText);
 
     if (!response.ok || looksLikeHtml) {
+      const defaultUrl = normalizeGasWebAppUrl((window.APP_CONFIG && window.APP_CONFIG.gasWebAppUrl) || window.__GAS_WEB_APP_URL__ || "");
+      if (!options.retryingWithDefault && defaultUrl && endpoint !== defaultUrl) {
+        persistGasWebAppUrl(defaultUrl);
+        return invokeRemoteBackendMethod(methodName, args, { retryingWithDefault: true });
+      }
       if (response.status === 401 || response.status === 403) {
         throw new Error("GAS Web App ยังไม่ได้เปิดสิทธิ์ให้ใช้งาน กรุณาตั้งค่า deployment ให้เข้าถึงได้");
       }
