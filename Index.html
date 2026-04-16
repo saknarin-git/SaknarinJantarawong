@@ -3044,6 +3044,7 @@
     const autoRetriedPendingSavesRef = useRef(false);
     const initialLoadRequestSeqRef = useRef(0);
     const unauthorizedRecoveryRetryRef = useRef(false);
+    const unauthorizedRecoveryPhaseRef = useRef(0);
     const paymentManagementRequestSeqRef = useRef(0);
     const lastActiveTabRef = useRef(activeTab);
     const backendReadCacheRef = useRef(new Map());
@@ -3135,6 +3136,31 @@
       backendInFlightRef.current.set(normalizedKey, requestPromise);
       return requestPromise;
     }, [callBackend]);
+    const recoverFromUnauthorizedState = useCallback((message, retryFn) => {
+      try {
+        sessionStorage.removeItem("gasSessionToken");
+      } catch (e) {}
+      clearBackendReadCache();
+      if (unauthorizedRecoveryPhaseRef.current < 2) {
+        unauthorizedRecoveryPhaseRef.current += 1;
+        unauthorizedRecoveryRetryRef.current = unauthorizedRecoveryPhaseRef.current > 0;
+        if (unauthorizedRecoveryPhaseRef.current >= 2) {
+          resetClientSession("");
+        }
+        setTimeout(() => retryFn(), 120);
+        return true;
+      }
+      unauthorizedRecoveryRetryRef.current = false;
+      unauthorizedRecoveryPhaseRef.current = 0;
+      setSessionHealth({
+        status: "error",
+        message: message || "เชื่อมต่อฐานข้อมูลไม่สำเร็จ",
+        checkedAt: Date.now()
+      });
+      setInitialLoadError(message || "เชื่อมต่อฐานข้อมูลไม่สำเร็จ");
+      setIsDataLoaded(true);
+      return true;
+    }, [clearBackendReadCache, resetClientSession]);
     const shouldSkipRecentBackendTouch = useCallback((ref, key, ttlMs) => {
       const normalizedKey = String(key || "").trim();
       if (!normalizedKey) return false;
@@ -4288,16 +4314,7 @@ const [cancellingTransactionId, setCancellingTransactionId] = useState("");
             if (!data || data.status === "Error") {
               const serverMessage = (data == null ? void 0 : data.message) || "ไม่สามารถโหลดข้อมูลจากฐานข้อมูลได้";
               if (serverMessage.indexOf("UNAUTHORIZED") !== -1 || serverMessage.indexOf("เข้าสู่ระบบใหม่") !== -1) {
-                try {
-                  sessionStorage.removeItem("gasSessionToken");
-                } catch (e) {}
-                if (!unauthorizedRecoveryRetryRef.current) {
-                  unauthorizedRecoveryRetryRef.current = true;
-                  setTimeout(() => loadInitialData(), 120);
-                  return;
-                }
-                unauthorizedRecoveryRetryRef.current = false;
-                resetClientSession("");
+                recoverFromUnauthorizedState(serverMessage, loadInitialData);
                 return;
               }
               throw new Error(serverMessage);
@@ -4341,6 +4358,7 @@ const [cancellingTransactionId, setCancellingTransactionId] = useState("");
                 return !prev || prevMonthKey === currentMonthKey ? safeOperatingDayCalendar[currentMonthKey] : prev;
               });
             }
+            unauthorizedRecoveryPhaseRef.current = 0;
             unauthorizedRecoveryRetryRef.current = false;
             setIsDataLoaded(true);
             refreshPendingBackgroundSaveState();
@@ -4357,18 +4375,10 @@ const [cancellingTransactionId, setCancellingTransactionId] = useState("");
           if (requestId !== initialLoadRequestSeqRef.current) return;
           const message = "ไม่สามารถเชื่อมต่อฐานข้อมูลได้: " + (((error == null ? void 0 : error.message) || error || "ไม่ทราบสาเหตุ"));
           if (message.indexOf("UNAUTHORIZED") !== -1 || message.indexOf("เข้าสู่ระบบใหม่") !== -1) {
-            try {
-              sessionStorage.removeItem("gasSessionToken");
-            } catch (e) {}
-            if (!unauthorizedRecoveryRetryRef.current) {
-              unauthorizedRecoveryRetryRef.current = true;
-              setTimeout(() => loadInitialData(), 120);
-              return;
-            }
-            unauthorizedRecoveryRetryRef.current = false;
-            resetClientSession("");
+            recoverFromUnauthorizedState(message, loadInitialData);
             return;
           }
+          unauthorizedRecoveryPhaseRef.current = 0;
           setLoans([]);
           setMembers([]);
           setRecentTransactions([]);
@@ -4405,6 +4415,7 @@ const [cancellingTransactionId, setCancellingTransactionId] = useState("");
       setOperatingDayCalendar(normalizeOperatingDayCalendarFrontend((safeData == null ? void 0 : safeData.settings) && safeData.settings.operatingDayCalendar));
       setReportLayoutSettings(normalizeReportLayoutSettingsFrontend((safeData == null ? void 0 : safeData.settings) && safeData.settings.reportLayoutSettings));
       setMenuSettings(normalizeMenuSettingsFrontend((safeData == null ? void 0 : safeData.settings) && safeData.settings.menuSettings));
+      unauthorizedRecoveryPhaseRef.current = 0;
       unauthorizedRecoveryRetryRef.current = false;
       setIsDataLoaded(true);
       refreshPendingBackgroundSaveState();
@@ -4427,16 +4438,7 @@ const [cancellingTransactionId, setCancellingTransactionId] = useState("");
         const message = data && data.message || "ไม่สามารถรีเฟรชข้อมูลล่าสุดได้";
         if (!data || data.status === "Error") {
           if (String(message).indexOf("UNAUTHORIZED") !== -1 || String(message).indexOf("เข้าสู่ระบบใหม่") !== -1) {
-            try {
-              sessionStorage.removeItem("gasSessionToken");
-            } catch (e) {}
-            if (!unauthorizedRecoveryRetryRef.current) {
-              unauthorizedRecoveryRetryRef.current = true;
-              setTimeout(() => loadInitialData(), 120);
-            } else {
-              unauthorizedRecoveryRetryRef.current = false;
-              resetClientSession("");
-            }
+            recoverFromUnauthorizedState(message, loadInitialData);
           }
           throw new Error(message);
         }
