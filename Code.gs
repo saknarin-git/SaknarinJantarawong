@@ -89,8 +89,19 @@ function doPost(e) {
       sessionData: getApiSessionFromToken_(sessionToken)
     };
 
+    var hadSessionBefore = !!(ACTIVE_API_REQUEST_CONTEXT_.sessionData && ACTIVE_API_REQUEST_CONTEXT_.sessionData.username);
     var backendFn = this[methodName];
     var result = backendFn.apply(null, args);
+
+    if (!hadSessionBefore && !LOGIN_REQUIRED && ACTIVE_API_REQUEST_CONTEXT_.sessionData && ACTIVE_API_REQUEST_CONTEXT_.sessionData.username) {
+      try {
+        var newToken = createApiSessionToken_(ACTIVE_API_REQUEST_CONTEXT_.sessionData);
+        if (newToken && result && typeof result === 'object') {
+          result.sessionToken = newToken;
+        }
+      } catch (e) {}
+    }
+
     return createJsonApiResponse_(result);
   } catch (error) {
     return createJsonApiResponse_({
@@ -436,18 +447,36 @@ function touchAuthenticatedSession_(sessionData) {
 }
 
 function requireAuthenticatedSession_() {
-  var sessionData = getAuthenticatedSession_();
+  var sessionData = null;
+  try {
+    sessionData = getAuthenticatedSession_();
+  } catch (e) {}
 
   if (!LOGIN_REQUIRED) {
+    var directAccessDefaults = {
+      userId: 'direct-access',
+      username: 'admin',
+      fullName: 'ผู้ดูแลระบบ',
+      role: 'admin',
+      issuedAt: new Date().toISOString()
+    };
     if (!sessionData || !sessionData.username) {
-      sessionData = createAuthenticatedSession_({
-        userId: 'direct-access',
-        username: 'admin',
-        fullName: 'ผู้ดูแลระบบ',
-        role: 'admin'
-      });
+      try {
+        sessionData = createAuthenticatedSession_(directAccessDefaults);
+      } catch (e) {
+        sessionData = directAccessDefaults;
+        try {
+          if (ACTIVE_API_REQUEST_CONTEXT_) {
+            ACTIVE_API_REQUEST_CONTEXT_.sessionData = sessionData;
+          }
+        } catch (e2) {}
+      }
     }
-    return touchAuthenticatedSession_(sessionData) || sessionData;
+    try {
+      return touchAuthenticatedSession_(sessionData) || sessionData;
+    } catch (e) {
+      return sessionData;
+    }
   }
 
   if (!sessionData || !sessionData.username) {
@@ -486,6 +515,20 @@ function requireAuthenticatedSession_() {
     role: authSnapshot.role || sessionData.role,
     issuedAt: sessionData.issuedAt || new Date().toISOString()
   }) || sessionData;
+}
+
+function createGuestSession() {
+  var sessionData = requireAuthenticatedSession_();
+  var sessionToken = '';
+  try {
+    sessionToken = createApiSessionToken_(sessionData);
+  } catch (e) {}
+  return {
+    status: 'Success',
+    sessionToken: sessionToken,
+    username: sessionData.username || 'admin',
+    role: sessionData.role || 'admin'
+  };
 }
 
 function getCurrentActorName_() {

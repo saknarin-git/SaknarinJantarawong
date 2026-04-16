@@ -1,0 +1,47 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Deploy GAS app",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				".\\scripts\\deploy.ps1"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Check GAS deployments",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"clasp",
+				"deployments"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Deploy GAS app to log",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				".\\scripts\\deploy.ps1",
+				">",
+				".\\deploy-output.log"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Deploy GAS app to log shell",
+			"type": "shell",
+			"command": "powershell -ExecutionPolicy Bypass -File .\\scripts\\deploy.ps1 *> .\\deploy-output.log",
+			"isBackground": false
+		}
+	]
+}

@@ -3147,7 +3147,24 @@
         if (unauthorizedRecoveryPhaseRef.current >= 2) {
           resetClientSession("");
         }
-        setTimeout(() => retryFn(), 120);
+        const doRetry = () => {
+          try {
+            callBackend("createGuestSession").then((response) => {
+              try {
+                const parsed = typeof response === "string" ? JSON.parse(response) : response || {};
+                if (parsed.sessionToken) {
+                  try { sessionStorage.setItem("gasSessionToken", parsed.sessionToken); } catch (_) {}
+                }
+              } catch (_) {}
+              retryFn();
+            }).catch(() => {
+              retryFn();
+            });
+          } catch (_) {
+            retryFn();
+          }
+        };
+        setTimeout(doRetry, 200);
         return true;
       }
       unauthorizedRecoveryRetryRef.current = false;
@@ -3160,7 +3177,7 @@
       setInitialLoadError(message || "เชื่อมต่อฐานข้อมูลไม่สำเร็จ");
       setIsDataLoaded(true);
       return true;
-    }, [clearBackendReadCache, resetClientSession]);
+    }, [callBackend, clearBackendReadCache, resetClientSession]);
     const shouldSkipRecentBackendTouch = useCallback((ref, key, ttlMs) => {
       const normalizedKey = String(key || "").trim();
       if (!normalizedKey) return false;
